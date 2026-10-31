@@ -1,0 +1,19 @@
+Decoder benchmark: c2.amlogic.hevc.decoder HEVC 1920x1080@60, 60+300 frames x 3 rounds (alternating order, after a discarded warm-up run)
+Display refresh: 60.00 Hz
+
+mode      mean    p50     p95     max     out%   dispFPS dispMs  p95 per round    status / keys
+original  2.74    2.75    3.35    5.63    100.0  58.2    23.23   2.44/2.48/5.12   OK | low-latency=1
+standard  2.68    2.61    3.36    5.65    100.0  40.9    23.53   2.42/2.48/5.18   FAIL: only 40.9 FPS displayed | low-latency=1, priority=0
+vendor    2.32    2.33    2.62    3.24    100.0  56.3    24.88   2.46/2.46/2.94   OK | low-latency=1, vdec-lowlatency=1, priority=0, vendor.START.low-latency.enable=1
+off       5.60    5.59    6.86    8.17    100.0  58.0    24.93   7.16/6.20/7.22   OK | (none)
+
+Recommended (used by 'auto'): original - a configuration was 0.73 ms faster on average but not in every round
+Max decode throughput: 383 FPS at 1920x1080 -> 60 FPS OK, 120 FPS OK
+
+Decode = queueInputBuffer() -> dequeueOutputBuffer(); measured with System.nanoTime().
+dispMs = release -> display time reported by Android (OnFrameRenderedListener), if supported.
+dispMs depends on the phase between the feed timer and vsync (it can differ by up to one
+refresh between runs), so it is NOT used to compare configurations.
+Max throughput is measured without rendering (decoder capacity only).
+Network, host encoding and TV processing are NOT included. Verify visually that the
+frame counter in the top-left corner moved smoothly during every run.

@@ -44,7 +44,7 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `tools/*` | Reloj de latencia, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.4.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.5.apk` | APK compilado (release, R8). |
 
 ## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
 
@@ -79,7 +79,17 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `diagnostics/DeviceCapabilityReport.java` | Nombre del tipo de conexión de la pantalla. |
 | `app/build.gradle` | Versión `12.2-ULL.4` (31504). |
 
-## 4.6 Compatibilidad
+## 4.6 Versión 12.2-ULL.5
+
+| Archivo | Cambio |
+|---|---|
+| `diagnostics/SessionReport.java` | Informes en `ull-sessions/<versión>/`; migración única de los archivos de versiones anteriores (sesiones según su `app_version`, el resto a `unversioned/`); la lista de sesiones recorre todas las versiones y muestra la versión. |
+| `diagnostics/DeviceCapabilityReport.java`, `DecoderBenchmark.java` | Versión de la app en la cabecera de los informes. |
+| `diagnostics/DecoderBenchmark.java`, `binding/video/PipelineStats.java` | Comprobación de presentación por mediana de rondas (proporción presentados/liberados ≥ 50 %), espera a las notificaciones tardías, columna `disp%`. |
+| `app/build.gradle` | Versión `12.2-ULL.5` (31505). |
+| Tests | 36. |
+
+## 4.7 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

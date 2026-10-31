@@ -10,7 +10,7 @@ the official app (`com.limelight.ull`) for A/B comparisons.
 * Per-stage latency statistics (ns clock), session reports, A/B comparison, capability report
 * Profiles: Ultra Low Latency (default), Balanced, Maximum quality, Original Moonlight
 
-Documentation (Spanish): [docs/ULL/README.md](docs/ULL/README.md). APK: `dist/` (current: 12.2-ULL.4).
+Documentation (Spanish): [docs/ULL/README.md](docs/ULL/README.md). APK: `dist/` (current: 12.2-ULL.5).
 
 ---
 

@@ -4,7 +4,7 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación (versión 12.2-ULL.4).**
+> **Estado de la validación (versión 12.2-ULL.5).**
 > Compila, el APK se genera y los 32 tests unitarios pasan. Medidas reales en el ZTE
 > ([09-resultados-zte.md](09-resultados-zte.md)): SoC S905Y4 confirmado. En este equipo, la
 > configuración de decodificador de Moonlight original ya es óptima (H.264 1080p ≈ 2,3 ms con
@@ -32,8 +32,8 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.4.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.4.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.5.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.5.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
@@ -54,6 +54,19 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 7. [07-sunshine.md](07-sunshine.md) — Configuración recomendada de Sunshine.
 8. [08-compilacion.md](08-compilacion.md) — Cómo compilar futuras versiones.
 9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE** y cambios de la versión ULL.2.
+
+## Dónde se guardan los informes
+
+En el propio equipo, sin permisos especiales, con **una carpeta por versión** de la app:
+
+```
+/sdcard/Android/data/com.limelight.ull/files/ull-sessions/
+├── 12.2-ULL.5/        capabilities-*.txt, decoder-bench-*.txt, session-*.json, session-*-frames.csv
+├── 12.2-ULL.4/        ...
+└── unversioned/       informes de capacidades y benchmarks de versiones anteriores a ULL.5
+```
+
+`tools/collect-diagnostics.sh` (o `adb pull .../ull-sessions`) trae todas las carpetas.
 
 ## Herramientas (`tools/`)
 

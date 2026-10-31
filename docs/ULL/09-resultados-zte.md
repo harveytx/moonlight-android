@@ -290,3 +290,81 @@ primer **CSV por fotograma** (14 928 fotogramas). La pantalla se identifica por 
    vídeo en movimiento, 2–3 sesiones de ≥ 1 min con CSV por fotograma.
 3. Mismo contenido con el perfil "Moonlight original" para la comparación directa.
 
+## 9.8 Cuarta ronda (ULL.3, 31-10-2026 08:18–08:24) y versión ULL.5
+
+Datos: benchmarks H.264 y HEVC (aún con la pausa del fotograma 59), una sesión "custom" con
+presentación equilibrada y CSV, y **la primera sesión del perfil Ultra Low Latency con imagen en
+movimiento**.
+
+### Benchmark
+
+* H.264: "original" vuelve a ser el más rápido (2,32 / 2,53 ms, p95 por ronda 2,52 / 2,54 / 2,52). Es
+  la cuarta confirmación.
+* HEVC: "vendor" es el mejor en media (2,32 / 2,62), pero perdió una ronda frente a "original" (2,46
+  frente a 2,44), así que se mantuvo "original".
+* Hubo dos **fallos falsos** por "FPS presentados": "vendor" en H.264 (44,4 FPS) y "standard" en HEVC
+  (40,9 FPS), cada uno en una sola ronda. *Interpretación*: Android puede entregar tarde o agrupadas
+  las notificaciones de presentación, y el recuento se cerraba antes de que llegaran. Bastaba una
+  ronda así para descartar la configuración entera. **Corregido en ULL.5**: se espera a que dejen de
+  llegar notificaciones, se usa la proporción de fotogramas presentados frente a liberados (mediana
+  de las rondas) y solo se rechaza por debajo del 50 %. El "efecto diapositiva" real queda muy por
+  debajo de ese umbral.
+
+### Sesiones: presentación equilibrada frente al perfil ULL (mismo códec y decodificador)
+
+| | 08:18 "custom" (equilibrado, 15 Mbps) | 08:20 **perfil ULL** (inmediata, 20 Mbps) | Diferencia |
+|---|---|---|---|
+| Mbps reales / FPS recibidos | 7,2 / 56,9 | 7,8 / 56,3 | similar |
+| Decodificación media / p95 | 2,85 / 4,14 | 2,60 / 3,90 | −0,25 / −0,24 |
+| Decodificado → liberado media | 14,29 | 1,29 | −13,0 |
+| Liberado → pantalla media | 13,43 | 21,61 | +8,2 |
+| **1er paquete → pantalla, media** | 32,72 | **27,89** | **−4,8 ms (−15 %)** |
+| 1er paquete → pantalla, p50 / p95 | 34,08 / 38,24 | **28,38 / 34,74** | −5,7 / −3,5 |
+
+Es la comparación más limpia hasta ahora: mismo H.264, misma configuración del decodificador, misma
+prioridad y contenido similar. **Pero no es una mejora frente a Moonlight original**: la presentación
+"menor latencia" es también la opción por defecto de Moonlight. Lo que mide es el coste de la
+presentación "equilibrada" (que usan los perfiles Equilibrado y Máxima calidad) en este equipo: unos
+5 ms.
+
+### Estado frente a Moonlight original en este ZTE (resumen honesto)
+
+| Aspecto | Moonlight original (por defecto) | Perfil ULL | Diferencia medida |
+|---|---|---|---|
+| Claves del decodificador | `low-latency=1` | La misma (el benchmark confirmó 4 veces que es la mejor) | 0 |
+| Presentación | Menor latencia | Menor latencia | 0 |
+| Códec | Auto → HEVC con `low-latency=1` | H.264 | ~0 en decodificación (HEVC 2,3–2,7 ms, H.264 2,3 ms en el benchmark) |
+| Prioridad de `VideoRecv` | nice 0 | nice −8 | No medida por separado (afectaría a las colas, p99) |
+| Protección de latencia | — | Agresiva | 0 resincronizaciones en todas las sesiones: sin efecto en condiciones normales |
+| moonlight-common-c | Anterior | Con correcciones de pérdidas | 0 pérdidas en todas las sesiones: no se ha ejercitado |
+| Overlay formateado en el hilo de recepción | Sí (si el overlay está activado) | No | Colas p99 con el overlay activado |
+
+**Conclusión provisional.** En condiciones normales de este ZTE (cable, sin pérdidas, decodificador
+holgado), **la latencia mediana del perfil ULL debería ser prácticamente igual a la de Moonlight
+original**: la configuración óptima ya era la suya. Las diferencias de ULL están en la robustez
+(colas, pérdidas, saturación del decodificador) y en haber medido y verificado esa configuración. Lo
+que de verdad se ha medido que cuesta latencia en este equipo, y conviene evitar, es:
+
+- Usar presentación "equilibrada": ~5 ms.
+- Subir el bitrate: ~0,19 ms por Mbps real.
+- HEVC con la regla de seguridad Amlogic: ~3 ms más de decodificación.
+
+Falta la prueba directa contra la app oficial (5.4, configuración A).
+
+**Presupuesto de latencia de la sesión ULL** (p50): host 4,5 ms · recepción 1,0 · hasta el
+decodificador 1,1 · decodificación 2,4 · liberación 1,2 · **liberado → pantalla 22,8** (espera al
+vsync más el plazo de SurfaceFlinger de 13,7 ms) · más el monitor. El mayor tramo que queda está en la
+composición de Android. La única vía conocida para recortarlo desde el cliente es el **modo túnel**
+de MediaCodec: el decodificador lo anuncia (`tunneled-playback`, parámetros `vendor.tunnel.*`) y
+saltaría SurfaceFlinger. Es experimental, no está implementado y tiene riesgos (sincronización con el
+audio). Se propone como siguiente experimento.
+
+### Cambios en ULL.5
+
+| Cambio | Motivo |
+|---|---|
+| **Una carpeta por versión**: los informes se guardan en `ull-sessions/<versión>/` (p. ej. `ull-sessions/12.2-ULL.5/`). Al primer arranque, los archivos de versiones anteriores se ordenan: cada sesión va a la carpeta de la versión que figura en su JSON y los demás (capacidades, benchmarks, que no llevaban versión) a `ull-sessions/unversioned/` | No mezclar datos de versiones distintas (petición del usuario) |
+| La versión de la app figura en la cabecera del informe de capacidades y del benchmark, y en la lista de sesiones | Identificar cada archivo aunque se mueva |
+| La comparación A/B sigue pudiendo elegir sesiones de cualquier versión | Comparar entre versiones es útil |
+| Benchmark: comprobación de presentación por mediana de rondas, esperando las notificaciones tardías; columna `disp%` | Fallos falsos de "FPS presentados" |
+
