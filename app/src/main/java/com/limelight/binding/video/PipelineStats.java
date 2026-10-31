@@ -39,6 +39,15 @@ public class PipelineStats {
     public static final int STAGE_JNI = 10;           // reassembled -> Java submitDecodeUnit() entry (part of SUBMIT)
     public static final int STAGE_COUNT = 11;
 
+    // ULL: frame sizes reuse the histogram machinery of the stages, recording one byte as one
+    // microsecond: the 20 µs resolution below 100 ms becomes 20 bytes below 100 kB, and the
+    // values read back in "ms" are kB (1000 bytes). Not part of the time stages above.
+    private static final int HIST_FRAME_SIZE = STAGE_COUNT;
+    private static final int HISTOGRAM_COUNT = STAGE_COUNT + 1;
+
+    /** A frame using at least this share of the estimated size ceiling counts as "at the ceiling". */
+    public static final double NEAR_CEILING_FRACTION = 0.85;
+
     public static final String[] STAGE_KEYS = {
             "receive", "submit", "input_wait", "decode", "pacing",
             "display", "client", "client_display", "queue_delay", "host", "jni"
@@ -74,6 +83,7 @@ public class PipelineStats {
         public long framesDisplayed;      // frames reported by OnFrameRenderedListener
         public long resyncs;              // IDR resyncs triggered by the latency guard
         public long bytesReceived;        // picture data bytes delivered to the decoder
+        public long framesNearCeiling;    // frames using >= NEAR_CEILING_FRACTION of the size ceiling
 
         void add(Counters o) {
             framesReceived += o.framesReceived;
@@ -86,6 +96,7 @@ public class PipelineStats {
             framesDisplayed += o.framesDisplayed;
             resyncs += o.resyncs;
             bytesReceived += o.bytesReceived;
+            framesNearCeiling += o.framesNearCeiling;
         }
 
         void copyFrom(Counters o) {
@@ -99,6 +110,7 @@ public class PipelineStats {
             framesDisplayed = o.framesDisplayed;
             resyncs = o.resyncs;
             bytesReceived = o.bytesReceived;
+            framesNearCeiling = o.framesNearCeiling;
         }
 
         void clear() {
@@ -111,6 +123,10 @@ public class PipelineStats {
         public final Counters counters = new Counters();
         public double durationSec;
         public double jitterMs;
+        /** Frame sizes: the *Ms fields of this summary hold kB (1000 bytes). */
+        public StageSummary frameSizeKb;
+        /** Estimated largest frame the host's encoder can send (bytes), 0 if unknown. */
+        public int frameCeilingBytes;
 
         public double fps(long frames) {
             return durationSec > 0 ? frames / durationSec : 0;
@@ -127,6 +143,14 @@ public class PipelineStats {
 
         public double bitrateMbps() {
             return durationSec > 0 ? (counters.bytesReceived * 8.0) / durationSec / 1_000_000.0 : 0;
+        }
+
+        /** Share of frames that used (almost) the whole per-frame budget, or -1 if unknown. */
+        public double nearCeilingPercent() {
+            if (frameCeilingBytes <= 0 || counters.framesReceived == 0) {
+                return -1;
+            }
+            return 100.0 * counters.framesNearCeiling / counters.framesReceived;
         }
     }
 
@@ -227,10 +251,11 @@ public class PipelineStats {
 
     private long inFlight;
     private FrameLog frameLog;
+    private int frameCeilingBytes;
 
     private static LatencyHistogram[] newStageArray() {
-        LatencyHistogram[] stages = new LatencyHistogram[STAGE_COUNT];
-        for (int i = 0; i < STAGE_COUNT; i++) {
+        LatencyHistogram[] stages = new LatencyHistogram[HISTOGRAM_COUNT];
+        for (int i = 0; i < HISTOGRAM_COUNT; i++) {
             stages[i] = new LatencyHistogram();
         }
         return stages;
@@ -240,6 +265,18 @@ public class PipelineStats {
         if (frameLog == null && capacityFrames > 0) {
             frameLog = new FrameLog(capacityFrames);
         }
+    }
+
+    /**
+     * Sets the estimated largest frame the host can send at the configured bitrate (see
+     * {@link BitrateBudget}); frames close to it are counted as limited by the bitrate.
+     */
+    public synchronized void setFrameCeilingBytes(int bytes) {
+        frameCeilingBytes = Math.max(bytes, 0);
+    }
+
+    public synchronized int getFrameCeilingBytes() {
+        return frameCeilingBytes;
     }
 
     public synchronized FrameLog getFrameLog() {
@@ -289,7 +326,12 @@ public class PipelineStats {
         windowCounters.framesReceived++;
         windowCounters.framesQueued++;
         windowCounters.bytesReceived += frameBytes;
+        if (frameCeilingBytes > 0 && frameBytes >= NEAR_CEILING_FRACTION * frameCeilingBytes) {
+            windowCounters.framesNearCeiling++;
+        }
         inFlight++;
+
+        windowStages[HIST_FRAME_SIZE].add(frameBytes * 1000L);
 
         windowStages[STAGE_RECEIVE].add(enqueueNs - receiveNs);
         windowStages[STAGE_SUBMIT].add(queuedNs - enqueueNs);
@@ -463,6 +505,7 @@ public class PipelineStats {
         double jitterMs;
         long closedDurationNs;
         long closedGeneration;
+        int ceilingBytes;
 
         synchronized (this) {
             startClocksIfNeeded(nowNs);
@@ -475,6 +518,7 @@ public class PipelineStats {
             closedDurationNs = nowNs - windowStartNs;
             windowStartNs = nowNs;
             jitterMs = jitterEstimator.getJitterMs();
+            ceilingBytes = frameCeilingBytes;
 
             synchronized (globalLock) {
                 // Visible to getSessionSnapshot() until it has been merged
@@ -490,13 +534,15 @@ public class PipelineStats {
         for (int i = 0; i < STAGE_COUNT; i++) {
             snap.stages[i] = StageSummary.of(closed[i]);
         }
+        snap.frameSizeKb = StageSummary.of(closed[HIST_FRAME_SIZE]);
+        snap.frameCeilingBytes = ceilingBytes;
         snap.counters.copyFrom(closedCounters);
         snap.durationSec = closedDurationNs / 1_000_000_000.0;
         snap.jitterMs = jitterMs;
 
         synchronized (globalLock) {
             if (closedGeneration == generation) {
-                for (int i = 0; i < STAGE_COUNT; i++) {
+                for (int i = 0; i < HISTOGRAM_COUNT; i++) {
                     globalStages[i].merge(closed[i]);
                 }
                 globalCounters.add(closedCounters);
@@ -524,14 +570,20 @@ public class PipelineStats {
             boolean includeClosing = closingStages != null && closingGeneration == generation;
             Snapshot snap = new Snapshot();
             LatencyHistogram tmp = new LatencyHistogram();
-            for (int i = 0; i < STAGE_COUNT; i++) {
+            for (int i = 0; i < HISTOGRAM_COUNT; i++) {
                 tmp.copyFrom(globalStages[i]);
                 if (includeClosing) {
                     tmp.merge(closingStages[i]);
                 }
                 tmp.merge(windowStages[i]);
-                snap.stages[i] = StageSummary.of(tmp);
+                if (i == HIST_FRAME_SIZE) {
+                    snap.frameSizeKb = StageSummary.of(tmp);
+                }
+                else {
+                    snap.stages[i] = StageSummary.of(tmp);
+                }
             }
+            snap.frameCeilingBytes = frameCeilingBytes;
             snap.counters.copyFrom(globalCounters);
             if (includeClosing) {
                 snap.counters.add(closingCounters);

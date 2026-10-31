@@ -368,3 +368,108 @@ audio). Se propone como siguiente experimento.
 | La comparación A/B sigue pudiendo elegir sesiones de cualquier versión | Comparar entre versiones es útil |
 | Benchmark: comprobación de presentación por mediana de rondas, esperando las notificaciones tardías; columna `disp%` | Fallos falsos de "FPS presentados" |
 
+
+## 9.9 Quinta ronda (ULL.5, 31-10-2026 08:39–08:52) e imagen a 80 Mbps (ULL.6)
+
+Datos en [data/zte-b866v2k/12.2-ULL.5/](data/zte-b866v2k/12.2-ULL.5/). Todas las sesiones son del
+escritorio del PC ("Desktop") a 1080p60 en el monitor LG UltraGear, por Ethernet.
+
+### Benchmark
+
+| Códec | Recomendado | p50 / p95 | Alternativa más rápida | Comentario |
+|---|---|---|---|---|
+| H.264 | original (`low-latency=1`) | 2,65 / 3,50 ms | vendor 2,32 / 2,76 ms | vendor no fue más rápido en la 1.ª ronda (3,16 frente a 2,58): se mantiene original, por quinta vez |
+| HEVC | **vendor** | 2,24 / 2,67 ms | — | Más rápido que original en las 3 rondas (p95 3,04/2,46/2,50 frente a 5,08/2,54/2,60) |
+
+`disp%` = 100 en todos los modos: la comprobación por mediana de ULL.5 elimina los falsos rechazos.
+
+### Sesiones
+
+| Hora | Perfil | Códec | Bitrate configurado / real | Host p50 | Decodificación p50 | Recepción p50 / p95 | 1.er paquete → liberado p50 |
+|---|---|---|---|---|---|---|---|
+| 08:39:36 | ULL | H.264 | 20 / 3,6 Mbps | 4,82 ms | 2,26 ms | 0,22 / 2,00 ms | 4,78 ms |
+| 08:40:46–08:41:32 (3) | original | HEVC | 20 / 1,4–1,7 | 5,62 | 2,26–2,38 | 0,04 / 1,3–2,0 | 4,52–5,20 |
+| 08:42:11 | Máxima calidad | HEVC | 50 / 0,7 | 5,52 | 2,42 | 0,02 / 0,04 | 21,40 (presentación equilibrada) |
+| 08:42:28 | Equilibrado | HEVC | 30 / 0,7 | 5,42 | 2,20 | 0,02 / 0,04 | 11,28 (presentación equilibrada) |
+| 08:42:41, 08:43:08 | ULL | H.264 | 20 / 1,1–1,3 | 4,72 | 2,28–2,56 | 0,04 / 0,18–0,20 | 4,56–5,04 |
+| 08:44:05 | personalizado (standard) | H.264 | 20 / 3,8 | 4,82 | 2,36 | 0,04 / 2,26 | 5,16 |
+| 08:44:45 | personalizado (vendor) | H.264 | 20 / 11,7 | 4,92 | 2,32 | 2,02 / 2,74 | 6,86 |
+| **08:48:05** (161 s) | personalizado (vendor) | H.264 | **50 / 22,8** | 5,02 | 2,50 | **5,62 / 6,62** | **10,84** |
+
+0 pérdidas y 0 resincronizaciones en todas. Lo que muestran:
+
+* **HEVC no cuesta decodificación en este ZTE** (2,2–2,4 ms frente a 2,3–2,6 ms en H.264). En el
+  PC, la latencia de host sube ~0,9 ms (5,62 frente a 4,72 ms con el mismo escritorio estático).
+* **El bitrate configurado no cuesta nada con la imagen quieta** (Máxima calidad, 50 Mbps: 0,7 Mbps
+  reales, recepción 0,02 ms). Cuesta cuando la imagen cambia: en la sesión de 50 Mbps,
+  1.er paquete → liberado pasó de ~5 ms a 10,84 ms. De esos ~6 ms, 5,6 ms son recepción.
+
+### Coste medido de cada kB por fotograma
+
+Con las 9 sesiones distintas de ULL.2 a ULL.5 (de 7 a 40 Mbps reales), la recepción media se ajusta
+a **−0,30 + 0,086 ms por kB de fotograma** (R² = 0,999). 0,086 ms/kB equivale a ~93 Mbps: los fotogramas llegan
+a la velocidad del puerto de 100 Mbps del ZTE. Es la cifra de 0,19 ms por Mbps real de 9.6,
+expresada por fotograma, y la que usa ULL.6 para sus estimaciones (`BitrateBudget`).
+
+### Qué daría 80 Mbps
+
+Sunshine reserva el FEC dentro del bitrate configurado y limita cada fotograma a un fotograma de
+bitrate de codificador (verificado en su código; tabla en [7.4](07-sunshine.md#74-bitrate-recomendado-para-el-zte)):
+
+| Configurado | Techo por fotograma | Recepción de un fotograma en el techo (*estimada*) |
+|---|---|---|
+| 20 Mbps | 32 kB | 2,7 ms |
+| 50 Mbps | 82 kB | 7,0 ms |
+| 80 Mbps | 132 kB | 11,3 ms |
+
+En la sesión de 50 Mbps, la recepción p50/p95 (5,62/6,62 ms) corresponde, con el ajuste anterior, a
+fotogramas de ~69/80 kB (*estimado*). Es decir, cuando había cambios en pantalla, muchos fotogramas
+estaban en el techo de 82 kB o cerca: **en esos momentos el bitrate sí limitaba la imagen**, y
+80 Mbps les daría un 61 % más de bits. El coste estimado es de hasta ~11 ms de recepción por
+fotograma en el techo (+4,3 ms frente a 50 Mbps, +8,6 ms frente a 20 Mbps). Además, el enlace iría
+al ~80 % en escenas complejas, con poco margen para ráfagas y riesgo de pérdidas (el informe las
+registra). Con la imagen quieta no cambia nada: Sunshine vuelve a codificar la imagen estática y la
+afina igualmente.
+
+**Conclusión.** En este ZTE, 80 Mbps es la forma más cara de mejorar la imagen. Antes conviene
+probar, de mayor a menor beneficio esperado por milisegundo:
+
+1. **Que nada escale la imagen.** El ZTE solo ofrece salidas de 720p, 1080p y 4K, no 1440p. El
+   monitor (EDID `GSM 5B8D`, 2023) acepta 4K60, pero su resolución nativa no se puede leer desde
+   Android y el identificador no aparece en las bases de datos públicas consultadas. Si el panel o
+   el escritorio del PC no son 1080p, hay escalado (Sunshine al capturar, el monitor o ambos), y en
+   un monitor de PC eso ablanda el texto más que cualquier bitrate. Si el panel es 4K, un stream 4K60
+   en HEVC lo evitaría: el decodificador HEVC admite 4K60, H.264 solo ~30 FPS a 4K, y Moonlight
+   cambia la salida del ZTE a 4K solo. Su coste de decodificación no está medido.
+2. **HEVC con el mismo bitrate** (medido arriba: misma decodificación, +0,9 ms en el PC).
+3. **Calidad del codificador en Sunshine** (preset, dos pasadas, AQ, FEC 10 %; ver
+   [7.7](07-sunshine.md#77-mejorar-la-imagen-sin-perder-de-vista-la-latencia)). Su coste aparece en
+   "Procesamiento en host".
+4. **Más bitrate**, solo si el overlay de ULL.6 muestra muchos fotogramas "en el techo".
+
+No es posible en este ZTE: croma 4:4:4. Ningún decodificador anuncia perfiles 4:4:4, así que el
+texto de color siempre saldrá algo borroso. El decodificador recibe hoy rango limitado
+(`color-range=2`); el rango completo es una opción por probar, no una mejora demostrada.
+
+### Cambios en ULL.6
+
+| Cambio | Motivo |
+|---|---|
+| **Tamaño de fotograma frente al techo de Sunshine.** En el overlay detallado: "Fotograma: p50 / p95 kB · techo ≈ X kB · en el techo Y %". En el informe: `frame_size_kb` (p50/p95/p99/máx, techo estimado, % de fotogramas ≥ 85 % del techo). También en el comparador A/B y en `compare-sessions.py` | Saber con datos si más bitrate puede mejorar algo, en lugar de suponerlo |
+| **Aviso de bitrate** con la contabilidad real de Sunshine (el FEC va dentro del bitrate; el aviso anterior sumaba un 20 % que Sunshine ya descuenta) y el tiempo de recepción de un fotograma en el techo según la medida de 9.9. Cabe en 2 líneas | Android 14 corta en 2 líneas los avisos emergentes (toast); el texto anterior era más largo |
+| **Pantalla en el informe:** modo de pantalla durante el stream (`display_mode`), escalado en el cliente (`client_scaling`) y rango de color (`color_range`) | Comparar resoluciones y salidas del ZTE sin anotarlas a mano |
+| `tools/image-test.html` | Patrón en píxeles físicos del PC: escalado (líneas de 1 px), negros y blancos, croma, texto y textura en movimiento, y ruido para forzar el techo |
+
+### Próximas pruebas (ULL.6)
+
+1. En el PC, abre `tools/image-test.html` en el navegador a pantalla completa (F11) y conéctate
+   al escritorio con el overlay detallado activado.
+2. Mira las líneas de 1 px en el monitor del ZTE. Si no están nítidas, hay escalado: indica el
+   modelo exacto del monitor (etiqueta trasera), la resolución del escritorio del PC y su escala de
+   Windows.
+3. Con el movimiento activado (M), 60 s por configuración, todas con el mismo patrón:
+   A: H.264 50 Mbps · B: H.264 80 Mbps · C: HEVC 50 Mbps · D: HEVC 80 Mbps.
+   Haz una foto del texto en movimiento en cada una y apunta "en el techo" del overlay.
+4. Opcional: 30 s de ruido (N, 768 px) a 80 Mbps, para ver el límite de la red (pérdidas,
+   recepción).
+5. Envía `ull-sessions/12.2-ULL.6/` y las fotos.

@@ -1,0 +1,151 @@
+Moonlight ULL device capability report
+App version: 12.2-ULL.5
+
+== System ==
+device: ZTE zBox 1 (YXE, board oppen, hardware amlogic)
+android: 14 API 34 build UKG3.250115.001.eng.ztestb.20250819.213655 release-keys
+fingerprint: ZTE/B866V2K/YXE:14/UKG3.250115.001/V86611396.0016:user/release-keys
+SoC: Amlogic AMLS905Y4
+media performance class: 0
+ABIs: armeabi-v7a armeabi 
+CPU cores: 4, max freq: 2004MHz 2004MHz 2004MHz 2004MHz
+cpufreq governor: schedutil
+RAM: 1920 MB total, 697 MB available, low RAM device: false
+GL renderer: Mali-G31
+sustained performance mode supported: false
+thermal status: 0
+is TV: true
+
+== Display ==
+refresh rate: 60.000004 Hz
+app vsync offset: 2000 us, presentation deadline: 13666 us
+current mode: 1920x1080@60.000004
+modes: 1920x1080@59.94 1920x1080@60.00 3840x2160@59.94 3840x2160@60.00 3840x2160@50.00 3840x2160@29.97 3840x2160@30.00 3840x2160@25.00 3840x2160@23.98 3840x2160@24.00 1920x1080@50.00 1280x720@59.94 1280x720@60.00 1280x720@50.00
+HDR types: 2
+product (EDID): LG ULTRAGEAR, manufacturer PnP ID GSM, product ID 23437, year 2023, connection direct
+minimal post-processing (ALLM/Game Content Type) supported: false
+
+== Network ==
+transport: Ethernet
+link bandwidth estimate: down 100000 kbps, up 100000 kbps
+interface: eth0 mtu 0
+link speed (sysfs): not readable
+Note: a 100 Mbps Ethernet link adds ~0.08 ms per KB of frame data. At 20 Mbps/60 FPS a typical
+frame (~42 KB + FEC) needs ~4 ms on the wire; at 50 Mbps ~10 ms.
+
+== Video decoders (hardware, as Moonlight sees them) ==
+video/avc:
+  c2.amlogic.avc.decoder [HW] [vendor]
+    profiles/levels: Baseline@L5.1, ConstrainedBaseline@L5.1, Main@L5.1, High@L5.1, ConstrainedHigh@L5.1
+    features: adaptive-playback tunneled-playback low-latency
+    max instances: 9
+    widths: [96, 4096] heights: [96, 4096] alignment: 2x2
+    bitrate range: [1, 300000000]
+    1280x720: supported fps [2.777777777777778E-4, 273.06666666666666], achievable (measured by vendor) [213.0, 213.0], 60fps=true, 120fps=true
+    1920x1080: supported fps [1.2254901960784314E-4, 120.47058823529412], achievable (measured by vendor) [134.0, 134.0], 60fps=true, 120fps=true
+    2560x1440: supported fps [6.944444444444444E-5, 68.26666666666667], achievable (measured by vendor) [75.93333333333334, 75.93333333333334], 60fps=true, 120fps=false
+    3840x2160: supported fps [3.08641975308642E-5, 30.340740740740742], achievable (measured by vendor) [33.74814814814815, 33.74814814814815], 60fps=false, 120fps=false
+    performance points: PerformancePoint(3840x2160@30) PerformancePoint(1920x1088@60) 
+    moonlight: FEATURE_LowLatency=true directSubmit=true slices=1 amlogic=true rfiAvc(1080p)=false spsFixup=false constrainedHigh=false
+    benchmark recommendation: original (decode p95 2.53 ms, original is fastest)
+    vendor parameters (32): vendor.Bitrate.value vendor.START.low-latency.enable vendor.datasource.type.value vendor.is-avi-discard.enable vendor.nrdp.video-peek-in-tunnel vendor.player-id.value vendor.scaling-freeze-mode.enable vendor.streammode.hwavsyncid.value vendor.streammode.inputdelay.value vendor.streammode.pipelinedelay.value vendor.tunerhal.hw-av-sync-id vendor.tunerhal.passthrough.event-mask vendor.tunerhal.passthrough.frame-advance vendor.tunerhal.passthrough.instance-no vendor.tunerhal.passthrough.mute vendor.tunerhal.passthrough.playback.status vendor.tunerhal.passthrough.screencolor-color vendor.tunerhal.passthrough.screencolor-mode vendor.tunerhal.passthrough.transition-mode-after vendor.tunerhal.passthrough.transition-mode-before vendor.tunerhal.passthrough.transition-preroll-av-tolerance vendor.tunerhal.passthrough.transition-preroll-rate vendor.tunerhal.passthrough.trick-mode vendor.tunerhal.passthrough.trick-speed vendor.tunerhal.passthrough.work-mode vendor.tunerhal.video-filter-id vendor.tunnel.push-blank-buffers-on-shutdown vendor.tunnel.set_solid_black_color vendor.unstable-pts.enable vendor.vdec.avc-4k-mmu.value vendor.vdec.error-policy.value vendor.vdec.workmode.value 
+video/hevc:
+  c2.amlogic.hevc.decoder [HW] [vendor]
+    profiles/levels: Main@0x20000, Main10@0x20000, Main10HDR10@0x20000, 0x2000@0x20000, 0x4@0x20000
+    features: adaptive-playback tunneled-playback low-latency
+    max instances: 9
+    widths: [128, 4096] heights: [128, 4096] alignment: 2x2
+    bitrate range: [1, 160000000]
+    1280x720: supported fps [2.777777777777778E-4, 576.0], achievable (measured by vendor) [191.0, 191.0], 60fps=true, 120fps=true
+    1920x1080: supported fps [1.2254901960784314E-4, 254.11764705882354], achievable (measured by vendor) [246.0, 247.0], 60fps=true, 120fps=true
+    2560x1440: supported fps [6.944444444444444E-5, 144.0], achievable (measured by vendor) [139.4, 139.96666666666667], 60fps=true, 120fps=true
+    3840x2160: supported fps [3.08641975308642E-5, 64.0], achievable (measured by vendor) [103.0, 103.0], 60fps=true, 120fps=false
+    performance points: PerformancePoint(3840x2160@60) 
+    moonlight: FEATURE_LowLatency=true directSubmit=true slices=1 amlogic=true hevcWhitelisted=true
+    benchmark recommendation: original (decode p95 3.35 ms, a configuration was 0.73 ms faster on average but not in every round)
+    vendor parameters (32): vendor.Bitrate.value vendor.START.low-latency.enable vendor.datasource.type.value vendor.is-avi-discard.enable vendor.nrdp.video-peek-in-tunnel vendor.player-id.value vendor.scaling-freeze-mode.enable vendor.streammode.hwavsyncid.value vendor.streammode.inputdelay.value vendor.streammode.pipelinedelay.value vendor.tunerhal.hw-av-sync-id vendor.tunerhal.passthrough.event-mask vendor.tunerhal.passthrough.frame-advance vendor.tunerhal.passthrough.instance-no vendor.tunerhal.passthrough.mute vendor.tunerhal.passthrough.playback.status vendor.tunerhal.passthrough.screencolor-color vendor.tunerhal.passthrough.screencolor-mode vendor.tunerhal.passthrough.transition-mode-after vendor.tunerhal.passthrough.transition-mode-before vendor.tunerhal.passthrough.transition-preroll-av-tolerance vendor.tunerhal.passthrough.transition-preroll-rate vendor.tunerhal.passthrough.trick-mode vendor.tunerhal.passthrough.trick-speed vendor.tunerhal.passthrough.work-mode vendor.tunerhal.video-filter-id vendor.tunnel.push-blank-buffers-on-shutdown vendor.tunnel.set_solid_black_color vendor.unstable-pts.enable vendor.vdec.avc-4k-mmu.value vendor.vdec.error-policy.value vendor.vdec.workmode.value 
+video/av01:
+  c2.amlogic.av1.decoder [HW] [vendor]
+    profiles/levels: 0x1@0x2000, 0x1000@0x2000, 0x2000@0x2000, 0x2@0x2000
+    features: adaptive-playback tunneled-playback low-latency
+    max instances: 9
+    widths: [96, 3840] heights: [96, 3840] alignment: 2x2
+    bitrate range: [1, 40000000]
+    1280x720: supported fps [2.777777777777778E-4, 540.0], achievable (measured by vendor) [220.0, 221.0], 60fps=true, 120fps=true
+    1920x1080: supported fps [1.2254901960784314E-4, 238.23529411764707], achievable (measured by vendor) [186.0, 187.0], 60fps=true, 120fps=true
+    2560x1440: supported fps [6.944444444444444E-5, 135.0], achievable (measured by vendor) [105.39999999999999, 105.96666666666667], 60fps=true, 120fps=true
+    3840x2160: supported fps [3.08641975308642E-5, 60.0], achievable (measured by vendor) [46.84444444444444, 47.096296296296295], 60fps=true, 120fps=false
+    performance points: PerformancePoint(3840x2160@60) 
+    moonlight: FEATURE_LowLatency=true directSubmit=true slices=1 amlogic=true
+    vendor parameters (32): vendor.Bitrate.value vendor.START.low-latency.enable vendor.datasource.type.value vendor.is-avi-discard.enable vendor.nrdp.video-peek-in-tunnel vendor.player-id.value vendor.scaling-freeze-mode.enable vendor.streammode.hwavsyncid.value vendor.streammode.inputdelay.value vendor.streammode.pipelinedelay.value vendor.tunerhal.hw-av-sync-id vendor.tunerhal.passthrough.event-mask vendor.tunerhal.passthrough.frame-advance vendor.tunerhal.passthrough.instance-no vendor.tunerhal.passthrough.mute vendor.tunerhal.passthrough.playback.status vendor.tunerhal.passthrough.screencolor-color vendor.tunerhal.passthrough.screencolor-mode vendor.tunerhal.passthrough.transition-mode-after vendor.tunerhal.passthrough.transition-mode-before vendor.tunerhal.passthrough.transition-preroll-av-tolerance vendor.tunerhal.passthrough.transition-preroll-rate vendor.tunerhal.passthrough.trick-mode vendor.tunerhal.passthrough.trick-speed vendor.tunerhal.passthrough.work-mode vendor.tunerhal.video-filter-id vendor.tunnel.push-blank-buffers-on-shutdown vendor.tunnel.set_solid_black_color vendor.unstable-pts.enable vendor.vdec.avc-4k-mmu.value vendor.vdec.error-policy.value vendor.vdec.workmode.value 
+
+== All codecs (MediaCodecList.ALL_CODECS, decoders) ==
+  c2.android.aac.decoder:
+  OMX.google.aac.decoder:
+  c2.android.amrnb.decoder:
+  OMX.google.amrnb.decoder:
+  c2.android.amrwb.decoder:
+  OMX.google.amrwb.decoder:
+  c2.android.flac.decoder:
+  OMX.google.flac.decoder:
+  c2.android.g711.alaw.decoder:
+  OMX.google.g711.alaw.decoder:
+  c2.android.g711.mlaw.decoder:
+  OMX.google.g711.mlaw.decoder:
+  c2.android.mp3.decoder:
+  OMX.google.mp3.decoder:
+  c2.android.opus.decoder:
+  OMX.google.opus.decoder:
+  c2.android.raw.decoder:
+  OMX.google.raw.decoder:
+  c2.android.vorbis.decoder:
+  OMX.google.vorbis.decoder:
+  c2.amlogic.audio.decoder.ac3:
+  c2.amlogic.audio.decoder.dts:
+  c2.amlogic.audio.decoder.dtse:
+  c2.amlogic.audio.decoder.dtshd:
+  c2.amlogic.audio.decoder.eac3:
+  c2.amlogic.audio.decoder.ffmpeg:
+  c2.amlogic.audio.decoder.mp1:
+  c2.amlogic.audio.decoder.mp2:
+  c2.amlogic.av1.decoder: video/av01
+  c2.amlogic.av1.decoder.secure: video/av01
+  c2.amlogic.avc.decoder: video/avc
+  c2.amlogic.avc.decoder.secure: video/avc
+  c2.amlogic.avs.decoder: video/avs
+  c2.amlogic.avs2.decoder: video/avs2
+  c2.amlogic.h263.decoder.sw: video/3gpp
+  c2.amlogic.hevc.decoder: video/hevc
+  c2.amlogic.hevc.decoder.secure: video/hevc
+  c2.amlogic.mjpeg.decoder: video/x-motion-jpeg
+  c2.amlogic.mpeg2.decoder: video/mpeg2
+  c2.amlogic.mpeg4.decoder: video/mp4v-es
+  c2.amlogic.rm10.decoder.sw: video/rm10
+  c2.amlogic.rm20.decoder.sw: video/rm20
+  c2.amlogic.rm30.decoder.sw: video/rm30
+  c2.amlogic.rm40.decoder.sw: video/rm40
+  c2.amlogic.vc1.decoder: video/vc1
+  c2.amlogic.vc1.decoder.sw: video/vc1
+  c2.amlogic.vp6a.decoder.sw: video/x-vnd.on2.vp6a
+  c2.amlogic.vp6f.decoder.sw: video/x-vnd.on2.vp6f
+  c2.amlogic.vp8.decoder.sw: video/x-vnd.on2.vp8
+  c2.amlogic.vp9.decoder: video/x-vnd.on2.vp9
+  c2.amlogic.vp9.decoder.secure: video/x-vnd.on2.vp9
+  c2.amlogic.wmv1.decoder.sw: video/wmv1
+  c2.amlogic.wmv2.decoder.sw: video/wmv2
+  c2.amlogic.wmv3.decoder.sw: video/wmv3
+  c2.android.av1.decoder: video/av01
+  c2.android.avc.decoder: video/avc
+  OMX.google.h264.decoder: video/avc
+  c2.android.h263.decoder: video/3gpp
+  OMX.google.h263.decoder: video/3gpp
+  c2.android.hevc.decoder: video/hevc
+  OMX.google.hevc.decoder: video/hevc
+  c2.android.mpeg4.decoder: video/mp4v-es
+  OMX.google.mpeg4.decoder: video/mp4v-es
+  c2.android.vp8.decoder: video/x-vnd.on2.vp8
+  OMX.google.vp8.decoder: video/x-vnd.on2.vp8
+  c2.android.vp9.decoder: video/x-vnd.on2.vp9
+  OMX.google.vp9.decoder: video/x-vnd.on2.vp9
+
+Session reports directory: /storage/emulated/0/Android/data/com.limelight.ull/files/ull-sessions/12.2-ULL.5

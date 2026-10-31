@@ -44,6 +44,43 @@ public class PipelineStatsTest {
     }
 
     @Test
+    public void frameSizesAreComparedWithTheCeiling() {
+        PipelineStats s = new PipelineStats();
+        s.setFrameCeilingBytes(100_000);
+        long t = 10_000 * MS;
+        for (int i = 0; i < 10; i++) {
+            // 8 small frames and 2 frames at 90 % of the ceiling
+            int bytes = i < 8 ? 10_000 : 90_000;
+            s.onFrameQueued(1000 + i, i + 1, t, t, t, 0, t, 0, 0, bytes);
+        }
+
+        PipelineStats.Snapshot w = s.rollWindow(t + 1000 * MS);
+        assertEquals(10, w.frameSizeKb.count);
+        assertEquals(10.0, w.frameSizeKb.p50Ms, 0.03);
+        assertEquals(90.0, w.frameSizeKb.maxMs, 0.03);
+        assertEquals(26.0, w.frameSizeKb.meanMs, 0.03);
+        assertEquals(100_000, w.frameCeilingBytes);
+        assertEquals(20.0, w.nearCeilingPercent(), 0.001);
+
+        // Session totals include the closed window and the open one
+        s.onFrameQueued(5000, 20, t, t, t, 0, t, 0, 0, 200_000);
+        PipelineStats.Snapshot session = s.getSessionSnapshot(t + 1500 * MS);
+        assertEquals(11, session.frameSizeKb.count);
+        assertEquals(200.0, session.frameSizeKb.maxMs, 1.0);
+        assertEquals(300.0 / 11, session.nearCeilingPercent(), 0.001);
+    }
+
+    @Test
+    public void nearCeilingIsUnknownWithoutCeiling() {
+        PipelineStats s = new PipelineStats();
+        long t = 10_000 * MS;
+        s.onFrameQueued(1000, 1, t, t, t, 0, t, 0, 0, 50_000);
+        PipelineStats.Snapshot w = s.rollWindow(t + 1000 * MS);
+        assertEquals(-1.0, w.nearCeilingPercent(), 0);
+        assertEquals(50.0, w.frameSizeKb.p50Ms, 0.03);
+    }
+
+    @Test
     public void droppedFramesAndLossAreCounted() {
         PipelineStats s = new PipelineStats();
         long t = 10_000 * MS;

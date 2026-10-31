@@ -30,6 +30,7 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `binding/video/PipelineStats.java` | Registro por fotograma, ventanas de 1 s, totales de sesión, CSV por fotograma. |
 | `binding/video/CpuUsageSampler.java` | CPU del proceso y del hilo `VideoRecv` desde `/proc`. |
 | `binding/video/DecoderTuningStore.java` | Persistencia del modo recomendado por el benchmark (ligado a la huella del firmware). |
+| `binding/video/BitrateBudget.java` | Contabilidad de bitrate de Sunshine (FEC, audio, techo por fotograma) y tiempo de recepción estimado con la medida del ZTE (ULL.6). |
 | `utils/StreamThreadPriority.java` | Prioridad de hilos nativos de vídeo y del hilo actual. |
 | `preferences/LatencyProfile.java` | Perfiles, aplicar, comprobar coincidencia, restaurar. |
 | `diagnostics/DiagnosticsActivity.java` | Pantalla de diagnóstico (D-pad). |
@@ -40,11 +41,11 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `res/layout/activity_ull_diagnostics.xml`, `activity_ull_decoder_benchmark.xml` | Interfaces. |
 | `res/values/strings_ull.xml`, `arrays_ull.xml` (+ `values-es`) | Textos en inglés y español. |
 | `assets/bench/h264_1080p60.h264`, `hevc_1080p60.h265` | Clips sintéticos de 120 fotogramas con contador visible (generados con `tools/generate-bench-clips.sh`). |
-| `app/src/test/...` (6 clases, 26 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser y recomendación. |
-| `tools/*` | Reloj de latencia, script adb, comparador de sesiones, generador de clips. |
+| `app/src/test/...` (8 clases, 43 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser, recomendación, informes y presupuesto de bitrate. |
+| `tools/*` | Reloj de latencia, patrón de imagen, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.5.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.6.apk` | APK compilado (release, R8). |
 
 ## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
 
@@ -89,7 +90,20 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `app/build.gradle` | Versión `12.2-ULL.5` (31505). |
 | Tests | 36. |
 
-## 4.7 Compatibilidad
+## 4.7 Versión 12.2-ULL.6
+
+| Archivo | Cambio |
+|---|---|
+| `binding/video/BitrateBudget.java` (nuevo) | Bitrate del codificador y techo por fotograma según el código de Sunshine; tiempo de recepción estimado (0,086 ms/kB medido a 100 Mbps). |
+| `binding/video/PipelineStats.java` | Histograma de tamaño de fotograma (mismo mecanismo de doble búfer que las etapas) y contador de fotogramas en el techo (≥ 85 %). |
+| `binding/video/MediaCodecDecoderRenderer.java` | Techo estimado al configurar; línea "Fotograma" del overlay detallado; modo de pantalla observado durante el stream; `frame_ceiling_kb_estimate`, `color_range`, `display_mode` y `client_scaling` en los diagnósticos. |
+| `diagnostics/SessionReport.java` | Sección `frame_size_kb` en el informe; tamaño p95 y "en el techo" en el texto y el comparador A/B (sin veredicto mejor/peor). |
+| `utils/StreamWarnings.java`, strings | Aviso de bitrate con la contabilidad de Sunshine (sin sumar el FEC otra vez) y tiempo por fotograma en el techo, en 2 líneas. |
+| `tools/image-test.html` (nuevo), `tools/compare-sessions.py` | Patrón de imagen; filas de tamaño de fotograma. |
+| `app/build.gradle` | Versión `12.2-ULL.6` (31506). |
+| Tests | 43 (nuevos: `BitrateBudgetTest`, tamaños de fotograma en `PipelineStatsTest`). |
+
+## 4.8 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

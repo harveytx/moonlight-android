@@ -4,8 +4,8 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación (versión 12.2-ULL.5).**
-> Compila, el APK se genera y los 32 tests unitarios pasan. Medidas reales en el ZTE
+> **Estado de la validación (versión 12.2-ULL.6).**
+> Compila, el APK se genera y los 43 tests unitarios pasan. Medidas reales en el ZTE
 > ([09-resultados-zte.md](09-resultados-zte.md)): SoC S905Y4 confirmado. En este equipo, la
 > configuración de decodificador de Moonlight original ya es óptima (H.264 1080p ≈ 2,3 ms con
 > `low-latency=1`). La mejora de "standard" que se anunció en ULL.2 **no se reprodujo** y se ha
@@ -13,6 +13,13 @@ procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como di
 > 100 Mbps, y liberar el fotograma al instante nunca es peor que "equilibrado" (entre ~1 y ~8 ms mejor según la sesión).
 > **Aún no hay una sesión del perfil ULL con imagen en movimiento** ni una comparación con la app
 > oficial. No se declara ninguna reducción de latencia que no esté medida.
+>
+> **Imagen y bitrate (ULL.6, [9.9](09-resultados-zte.md#99-quinta-ronda-ull5-31-10-2026-08390852-e-imagen-a-80-mbps-ull6)).**
+> Por el Ethernet de 100 Mbps, cada kB de fotograma cuesta 0,086 ms de recepción (medido). Así, 80 Mbps
+> supone hasta ~11 ms por fotograma en el techo de Sunshine, frente a ~7 ms a 50 Mbps. HEVC decodifica
+> igual de rápido que H.264 en este ZTE: para mejorar la imagen, antes que subir el bitrate están
+> evitar el escalado y usar HEVC. El overlay y el informe indican ahora si los fotogramas llegan al
+> techo, que es lo único que mejora con más bitrate.
 
 ## Qué cambia respecto a Moonlight original
 
@@ -28,18 +35,18 @@ procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como di
 
 Lo que **no** se cambió y por qué (Vulkan/OpenGL, FFmpeg, GStreamer, ExoPlayer, túnel multimedia,
 eliminación de copias en JNI, recvmmsg…) está justificado en
-[03-diseno-y-optimizaciones.md](03-diseno-y-optimizaciones.md#opciones-evaluadas-y-descartadas).
+[03-diseno-y-optimizaciones.md](03-diseno-y-optimizaciones.md#34-opciones-evaluadas-y-descartadas).
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.5.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.5.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.6.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.6.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
    2. *Benchmark del decodificador (H.264 1080p60)* (~1 minuto; mira que el contador se mueva fluido).
 4. Ajustes básicos: resolución **1080p**, **60 FPS**, bitrate según la tabla de
-   [07-sunshine.md](07-sunshine.md#bitrate-recomendado-para-el-zte) (por defecto el perfil ULL usa el
+   [07-sunshine.md](07-sunshine.md#74-bitrate-recomendado-para-el-zte) (por defecto el perfil ULL usa el
    de Moonlight: 20 Mbps a 1080p60).
 5. Activa *Mostrar estadísticas de rendimiento* para ver el desglose por etapa durante el juego.
 
@@ -53,7 +60,7 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 6. [06-zte-b866v2k.md](06-zte-b866v2k.md) — Hardware del ZTE, limitaciones y pruebas necesarias.
 7. [07-sunshine.md](07-sunshine.md) — Configuración recomendada de Sunshine.
 8. [08-compilacion.md](08-compilacion.md) — Cómo compilar futuras versiones.
-9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE** y cambios de la versión ULL.2.
+9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE**, cambios derivados de cada ronda (ULL.2–ULL.6) e imagen a 80 Mbps (9.9).
 
 ## Dónde se guardan los informes
 
@@ -61,8 +68,8 @@ En el propio equipo, sin permisos especiales, con **una carpeta por versión** d
 
 ```
 /sdcard/Android/data/com.limelight.ull/files/ull-sessions/
-├── 12.2-ULL.5/        capabilities-*.txt, decoder-bench-*.txt, session-*.json, session-*-frames.csv
-├── 12.2-ULL.4/        ...
+├── 12.2-ULL.6/        capabilities-*.txt, decoder-bench-*.txt, session-*.json, session-*-frames.csv
+├── 12.2-ULL.5/        ...
 └── unversioned/       informes de capacidades y benchmarks de versiones anteriores a ULL.5
 ```
 
@@ -73,6 +80,7 @@ En el propio equipo, sin permisos especiales, con **una carpeta por versión** d
 | Archivo | Uso |
 |---|---|
 | `latency-clock.html` | Reloj en milisegundos para medir latencia de extremo a extremo con cámara lenta (y entrada→pantalla con mando). |
+| `image-test.html` | Patrón de imagen en píxeles físicos del PC: escalado, negros/blancos, croma 4:2:0, texto y textura en movimiento, ruido para forzar el techo de bitrate. |
 | `collect-diagnostics.sh` | Recoge por `adb` la información del dispositivo y los informes de la app. |
 | `compare-sessions.py` | Compara dos informes de sesión (y sus CSV por fotograma con test estadístico). |
 | `generate-bench-clips.sh` | Regenera los clips sintéticos del benchmark. |

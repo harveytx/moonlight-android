@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<!--
+  Moonlight ULL - image test pattern.
+
+  Open this page full screen (F11) on the PC that runs Sunshine and stream the desktop to the
+  TV box. Everything is drawn in physical pixels of the PC screen (Windows scaling is undone),
+  so what reaches the TV can be judged against the original:
+
+  1. 1-pixel lines: crisp and even only if nothing in the chain scales the image (Sunshine
+     capture -> stream resolution, the box's output mode, the monitor's panel). Bands, waves
+     (moire) or grey blur mean that something scales.
+  2. Near-black / near-white steps: video range problems (crushed or grey blacks).
+  3. Colour text and lines: 4:2:0 chroma (always somewhat blurred with H.264/HEVC 4:2:0).
+  4. Motion (M): scrolling text and a panning detailed texture, to compare bitrates and codecs
+     where it matters. The "frame size" line of the Moonlight ULL overlay tells whether the
+     frames hit the bitrate's size limit (only then can more bitrate help).
+  5. Noise (N): worst case that fills every frame up to the size limit, to measure what a
+     bitrate costs on the network (receive time, losses), not to judge image quality.
+
+  Keys: M motion, N noise size, P pause, H help, F full screen.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Moonlight ULL - patrón de imagen</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+"use strict";
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false });
+let W = 0, H = 0, dpr = 1;
+let staticLayer = null, textLayer = null, textureLayer = null;
+let motion = true, paused = false, help = true, noiseStep = 0, frame = 0;
+const NOISE_SIZES = [0, 256, 512, 768];
+let fpsFrames = 0, fpsStart = performance.now(), fps = 0;
+let seed = 0x9e3779b9;
+
+function rand() { // xorshift32
+  seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+  return seed >>> 0;
+}
+
+function px(n) { return Math.round(n); }
+
+function font(size, weight) {
+  return (weight || "") + " " + px(size) + "px 'Segoe UI', Arial, sans-serif";
+}
+
+function label(c, text, x, y, size, color) {
+  c.font = font(size || 16);
+  c.fillStyle = color || "#aaa";
+  c.textBaseline = "top";
+  c.fillText(text, x, y);
+}
+
+function newLayer(w, h) {
+  const l = document.createElement("canvas");
+  l.width = w; l.height = h;
+  return l;
+}
+
+// Layout in physical pixels, scaled for screens from 1280x720 to 3840x2160
+function layout() {
+  const s = Math.max(0.6, Math.min(W / 1920, H / 1080));
+  const pad = px(20 * s);
+  const patch = px(160 * s);
+  return {
+    s, pad, patch,
+    gratingsY: px(70 * s),
+    levelsY: px(70 * s) + patch + px(60 * s),
+    colourX: pad + 4 * (patch + pad) + pad,
+    motionX: px(W * 0.52), motionY: px(H * 0.52),
+    motionW: W - px(W * 0.52) - pad, motionH: H - px(H * 0.52) - pad,
+  };
+}
+
+function drawGratings(c, L) {
+  const kinds = [
+    ["Líneas verticales 1 px", (x, y) => x % 2 === 0],
+    ["Líneas horizontales 1 px", (x, y) => y % 2 === 0],
+    ["Damero 1 px", (x, y) => (x + y) % 2 === 0],
+    ["Damero 2 px", (x, y) => ((x >> 1) + (y >> 1)) % 2 === 0],
+  ];
+  kinds.forEach(([name, on], i) => {
+    const x0 = L.pad + i * (L.patch + L.pad), y0 = L.gratingsY;
+    const img = c.createImageData(L.patch, L.patch);
+    for (let y = 0; y < L.patch; y++) {
+      for (let x = 0; x < L.patch; x++) {
+        const v = on(x, y) ? 255 : 0, o = (y * L.patch + x) * 4;
+        img.data[o] = img.data[o + 1] = img.data[o + 2] = v; img.data[o + 3] = 255;
+      }
+    }
+    c.putImageData(img, x0, y0);
+    label(c, name, x0, y0 + L.patch + px(6 * L.s), 14 * L.s);
+  });
+}
+
+function drawLevels(c, L) {
+  const box = px(44 * L.s), gap = px(6 * L.s);
+  const blacks = [0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32];
+  const whites = [223, 227, 231, 235, 239, 243, 247, 249, 251, 253, 255];
+  let y = L.levelsY;
+  label(c, "Negros: distingue el 4-8 del 0. Si 0-16 son iguales, se recorta; si el 0 se ve gris, rango mal interpretado.", L.pad, y, 14 * L.s);
+  y += px(24 * L.s);
+  c.fillStyle = "#000";
+  c.fillRect(L.pad, y, blacks.length * (box + gap) + gap, box + px(28 * L.s));
+  blacks.forEach((v, i) => {
+    const x = L.pad + gap + i * (box + gap);
+    c.fillStyle = `rgb(${v},${v},${v})`;
+    c.fillRect(x, y + gap, box, box - gap);
+    label(c, String(v), x, y + box + px(4 * L.s), 12 * L.s, "#777");
+  });
+  y += box + px(40 * L.s);
+  c.fillStyle = "#fff";
+  c.fillRect(L.pad, y, whites.length * (box + gap) + gap, box + px(28 * L.s));
+  whites.forEach((v, i) => {
+    const x = L.pad + gap + i * (box + gap);
+    c.fillStyle = `rgb(${v},${v},${v})`;
+    c.fillRect(x, y + gap, box, box - gap);
+    label(c, String(v), x, y + box + px(4 * L.s), 12 * L.s, "#555");
+  });
+  label(c, "Blancos: distingue 247-251 del 255.", L.pad, y + box + px(30 * L.s), 14 * L.s);
+  // Grey ramp: 8-bit steps, banding shows quantisation
+  y += box + px(60 * L.s);
+  const rampW = Math.min(1024, L.colourX - 2 * L.pad), rampH = px(40 * L.s);
+  for (let x = 0; x < rampW; x++) {
+    const v = Math.round(x * 255 / (rampW - 1));
+    c.fillStyle = `rgb(${v},${v},${v})`;
+    c.fillRect(L.pad + x, y, 1, rampH);
+  }
+  label(c, "Rampa de grises 0-255", L.pad, y + rampH + px(6 * L.s), 14 * L.s);
+}
+
+function drawColour(c, L) {
+  let x = L.colourX, y = L.gratingsY;
+  label(c, "Texto (luma): debe verse nítido", x, y, 14 * L.s); y += px(24 * L.s);
+  c.fillStyle = "#fff"; c.fillRect(x, y, px(520 * L.s), px(110 * L.s));
+  [10, 12, 14, 18].forEach((size, i) => {
+    label(c, `${size} px: El veloz murciélago hindú comía kiwi 0123456789`,
+      x + px(8 * L.s), y + px(6 * L.s) + i * px(26 * L.s), size * Math.max(1, L.s), "#000");
+  });
+  y += px(126 * L.s);
+  label(c, "Color (croma 4:2:0: algo borroso es normal en este ZTE)", x, y, 14 * L.s); y += px(24 * L.s);
+  const pairs = [["#ff0000", "#0000ff"], ["#0000ff", "#ff0000"], ["#00ff00", "#ff00ff"], ["#ffff00", "#000000"], ["#ff0000", "#000000"]];
+  pairs.forEach(([fg, bg], i) => {
+    c.fillStyle = bg; c.fillRect(x, y + i * px(30 * L.s), px(520 * L.s), px(30 * L.s));
+    label(c, `Texto ${fg} sobre ${bg} 16 px`, x + px(8 * L.s), y + i * px(30 * L.s) + px(6 * L.s), 16 * Math.max(1, L.s), fg);
+  });
+  y += pairs.length * px(30 * L.s) + px(12 * L.s);
+  // Alternating 1-px colour lines
+  const w = px(250 * L.s), h = px(60 * L.s);
+  const img = c.createImageData(w, h);
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+    const o = (yy * w + xx) * 4, red = xx % 2 === 0;
+    img.data[o] = red ? 255 : 0; img.data[o + 1] = 0; img.data[o + 2] = red ? 0 : 255; img.data[o + 3] = 255;
+  }
+  c.putImageData(img, x, y);
+  const img2 = c.createImageData(w, h);
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+    const o = (yy * w + xx) * 4, g = yy % 2 === 0;
+    img2.data[o] = g ? 0 : 255; img2.data[o + 1] = g ? 255 : 0; img2.data[o + 2] = g ? 0 : 255; img2.data[o + 3] = 255;
+  }
+  c.putImageData(img2, x + w + px(20 * L.s), y);
+  label(c, "Líneas de color de 1 px (con 4:2:0 se mezclan)", x, y + h + px(6 * L.s), 14 * L.s);
+}
+
+function buildMotionLayers(L) {
+  // Scrolling text, like a document being scrolled
+  const words = "La latencia mínima depende de cada etapa: captura, codificación, red, decodificación y presentación. " +
+    "Subir el bitrate solo mejora los fotogramas que llegan al techo de tamaño; el resto ya tiene todos los bits que necesita. ";
+  const tw = Math.floor(L.motionW / 2) - L.pad, lineH = px(22 * L.s);
+  textLayer = newLayer(tw, L.motionH * 3);
+  const t = textLayer.getContext("2d");
+  t.fillStyle = "#fff"; t.fillRect(0, 0, tw, textLayer.height);
+  t.font = font(16 * Math.max(1, L.s)); t.fillStyle = "#000"; t.textBaseline = "top";
+  let line = "", y = 4, i = 0;
+  const all = (words + words + words).split(" ");
+  while (y < textLayer.height - lineH) {
+    const word = all[i++ % all.length];
+    const test = line ? line + " " + word : word;
+    if (t.measureText(test).width > tw - 12) { t.fillText(line, 6, y); y += lineH; line = word; }
+    else line = test;
+  }
+  // Detailed texture (value noise at several scales), panned like a camera
+  const xw = Math.ceil(L.motionW / 2) + 1024, xh = L.motionH;
+  textureLayer = newLayer(xw, xh);
+  const x = textureLayer.getContext("2d");
+  const img = x.createImageData(xw, xh);
+  const grid = (cell) => {
+    const gw = Math.ceil(xw / cell) + 2, gh = Math.ceil(xh / cell) + 2, g = new Float32Array(gw * gh * 3);
+    for (let k = 0; k < g.length; k++) g[k] = (rand() & 0xffff) / 65535;
+    return { cell, gw, g };
+  };
+  const octaves = [grid(64), grid(16), grid(4), grid(1)];
+  const weights = [0.45, 0.3, 0.17, 0.08];
+  for (let yy = 0; yy < xh; yy++) for (let xx = 0; xx < xw; xx++) {
+    let r = 0, gr = 0, b = 0;
+    octaves.forEach((o, n) => {
+      const fx = xx / o.cell, fy = yy / o.cell, ix = Math.floor(fx), iy = Math.floor(fy), ax = fx - ix, ay = fy - iy;
+      const at = (cx, cy, ch) => o.g[((cy * o.gw) + cx) * 3 + ch];
+      for (let ch = 0; ch < 3; ch++) {
+        const v = (at(ix, iy, ch) * (1 - ax) + at(ix + 1, iy, ch) * ax) * (1 - ay) +
+                  (at(ix, iy + 1, ch) * (1 - ax) + at(ix + 1, iy + 1, ch) * ax) * ay;
+        if (ch === 0) r += v * weights[n]; else if (ch === 1) gr += v * weights[n]; else b += v * weights[n];
+      }
+    });
+    const o = (yy * xw + xx) * 4;
+    img.data[o] = r * 255; img.data[o + 1] = gr * 255; img.data[o + 2] = b * 255; img.data[o + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+}
+
+function drawStatic() {
+  staticLayer = newLayer(W, H);
+  const c = staticLayer.getContext("2d");
+  c.fillStyle = "#202020"; c.fillRect(0, 0, W, H);
+  const L = layout();
+  drawGratings(c, L);
+  drawLevels(c, L);
+  drawColour(c, L);
+  buildMotionLayers(L);
+}
+
+function drawHeader(L) {
+  const h = px(56 * L.s);
+  ctx.drawImage(staticLayer, 0, 0, W, h, 0, 0, W, h);
+  label(ctx, `Patrón de imagen ULL - pantalla ${W}x${H} px físicos (escala de Windows ${Math.round(dpr * 100)} %) - ` +
+    `fotograma ${frame} - ${fps.toFixed(0)} FPS` + (paused ? " - PAUSA" : ""), L.pad, px(10 * L.s), 18 * L.s, "#fff");
+  label(ctx, "Teclas: M movimiento " + (motion ? "sí" : "no") + ", N ruido " +
+    (NOISE_SIZES[noiseStep] ? NOISE_SIZES[noiseStep] + " px" : "no") + ", P pausa, H ayuda, F pantalla completa",
+    L.pad, px(34 * L.s), 14 * L.s);
+}
+
+function drawMotion(L) {
+  const half = Math.floor(L.motionW / 2);
+  ctx.fillStyle = "#202020"; ctx.fillRect(L.motionX, L.motionY, L.motionW, L.motionH);
+  if (motion) {
+    const span = textLayer.height - L.motionH;
+    const ty = (frame * 2) % span;
+    ctx.drawImage(textLayer, 0, ty, textLayer.width, L.motionH, L.motionX, L.motionY, textLayer.width, L.motionH);
+    const tx = (frame * 3) % (textureLayer.width - half);
+    ctx.drawImage(textureLayer, tx, 0, half, L.motionH, L.motionX + half, L.motionY, half, L.motionH);
+  }
+  const n = Math.min(NOISE_SIZES[noiseStep], L.motionW, L.motionH);
+  if (n > 0) {
+    const img = ctx.createImageData(n, n), d32 = new Uint32Array(img.data.buffer);
+    for (let k = 0; k < d32.length; k++) d32[k] = rand() | 0xff000000;
+    ctx.putImageData(img, L.motionX + L.motionW - n, L.motionY + L.motionH - n);
+  }
+}
+
+function drawHelp(L) {
+  if (!help) return;
+  const lines = [
+    "1. Líneas y dameros de 1 px: nítidos y uniformes = nada escala la imagen. Bandas, ondas o gris borroso = algo escala",
+    "   (resolución del stream distinta de la del escritorio del PC, de la salida del ZTE o de la del panel del monitor).",
+    "2. Negros y blancos: si no distingues los escalones, revisa 'Nivel de negro' del monitor y la opción de rango completo.",
+    "3. Color: el texto de color algo borroso es normal (croma 4:2:0); el texto negro sobre blanco debe ser nítido.",
+    "4. Movimiento: compara bitrates/códecs en el texto que se desplaza y en la textura. Mira en el overlay de",
+    "   Moonlight ULL 'Fotograma ... en el techo X %': si es bajo, subir el bitrate no cambia la imagen.",
+    "5. Ruido (N): peor caso; llena cada fotograma hasta el techo para medir el coste de red de un bitrate.",
+  ];
+  const x = L.pad, y = L.motionY, w = L.motionX - 2 * L.pad, lh = px(22 * L.s);
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(x, y, w, lines.length * lh + px(16 * L.s));
+  lines.forEach((t, i) => label(ctx, t, x + px(10 * L.s), y + px(8 * L.s) + i * lh, 14 * L.s, "#ddd"));
+}
+
+function tick() {
+  if (W && staticLayer) {
+    const L = layout();
+    if (!paused) frame++;
+    ctx.drawImage(staticLayer, 0, 0);
+    drawHeader(L);
+    drawMotion(L);
+    drawHelp(L);
+    fpsFrames++;
+    const now = performance.now();
+    if (now - fpsStart >= 1000) { fps = fpsFrames * 1000 / (now - fpsStart); fpsFrames = 0; fpsStart = now; }
+  }
+  requestAnimationFrame(tick);
+}
+
+function setSize(w, h) {
+  if (w === W && h === H) return;
+  W = w; H = h; canvas.width = W; canvas.height = H;
+  drawStatic();
+}
+
+dpr = window.devicePixelRatio || 1;
+try {
+  new ResizeObserver((entries) => {
+    dpr = window.devicePixelRatio || 1;
+    const e = entries[0];
+    let w = Math.round(e.contentRect.width * dpr), h = Math.round(e.contentRect.height * dpr);
+    // The exact device-pixel size avoids rounding errors, but only trust it when it agrees with
+    // the scale factor (some browsers report CSS pixels there)
+    const b = e.devicePixelContentBoxSize && e.devicePixelContentBoxSize[0];
+    if (b && Math.abs(b.inlineSize - w) <= 2 && Math.abs(b.blockSize - h) <= 2) { w = b.inlineSize; h = b.blockSize; }
+    setSize(w, h);
+  }).observe(canvas, { box: "device-pixel-content-box" });
+} catch (err) {
+  const fallback = () => { dpr = window.devicePixelRatio || 1; setSize(Math.round(innerWidth * dpr), Math.round(innerHeight * dpr)); };
+  addEventListener("resize", fallback); fallback();
+}
+
+addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  if (k === "m") motion = !motion;
+  else if (k === "n") noiseStep = (noiseStep + 1) % NOISE_SIZES.length;
+  else if (k === "p" || k === " ") paused = !paused;
+  else if (k === "h") help = !help;
+  else if (k === "f") { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+});
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

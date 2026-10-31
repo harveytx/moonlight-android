@@ -5,7 +5,7 @@
 | Verificación | Estado | Cómo |
 |---|---|---|
 | El código compila (Java + nativo, 4 ABIs) y R8/lint vital pasan | ✅ Hecho | `./gradlew assembleNonRootRelease` |
-| Lógica nueva (histograma, jitter, protección de latencia, estadísticas, parser Annex B, regla de recomendación) | ✅ 26/26 tests pasan | `./gradlew testNonRootDebugUnitTest` |
+| Lógica nueva (histograma, jitter, protección de latencia, estadísticas, parser Annex B, regla de recomendación) | ✅ 43/43 tests pasan | `./gradlew testNonRootDebugUnitTest` |
 | Los clips del benchmark tienen la estructura esperada (IDR + 119 P, SPS/PPS, 1 slice) | ✅ Test + `ffprobe` | `AnnexBClipTest` |
 | Funcionamiento en el ZTE B866V2K | ❌ **Pendiente** | Requiere el dispositivo (no disponible en el entorno de desarrollo, sin KVM para emulador) |
 | Mejora de latencia frente a Moonlight original | ❌ **Pendiente de medir** | Procedimiento de 5.3–5.5 |

@@ -779,6 +779,12 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         this.videoFormat = format;
         this.refreshRate = redrawRate;
 
+        // ULL: largest frame Sunshine can send at this bitrate, to tell whether frames are
+        // limited by the bitrate (a higher bitrate would only improve those)
+        pipelineStats.setFrameCeilingBytes(BitrateBudget.sunshineFrameCeilingBytes(
+                prefs.bitrate, redrawRate,
+                prefs.audioConfiguration != null ? prefs.audioConfiguration.channelCount : 2));
+
         if (prefs.latencyGuardMode != LatencyGuard.MODE_OFF) {
             latencyGuard = new LatencyGuard(prefs.latencyGuardMode, redrawRate);
             LimeLog.info("Latency guard enabled: mode " + prefs.latencyGuardMode +
@@ -1880,6 +1886,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     private void onStatsWindowClosed(VideoStats lastTwo, VideoStatsFps fps, long windowEndNs) {
         PipelineStats.Snapshot pipelineWindow = pipelineStats.rollWindow(windowEndNs);
         cpuSampler.sample(windowEndNs);
+        observeDisplayMode();
 
         if (!prefs.enablePerfOverlay || stopping) {
             return;
@@ -1920,6 +1927,34 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         perfListener.onPerfUpdate(sb.toString());
     }
 
+    // ULL: display mode while streaming (an HDMI mode switch can take a few seconds after the
+    // stream starts, and the mode may revert before the session report is written)
+    private volatile String observedDisplayMode;
+
+    private void observeDisplayMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || activity == null) {
+            return;
+        }
+        try {
+            android.view.Display.Mode mode = activity.getWindowManager().getDefaultDisplay().getMode();
+            observedDisplayMode = String.format(Locale.ROOT, "%dx%d@%.2f",
+                    mode.getPhysicalWidth(), mode.getPhysicalHeight(), mode.getRefreshRate());
+        } catch (RuntimeException e) {
+            // Diagnostics only
+        }
+    }
+
+    /** "none", or "WxH -> WxH" when the client scales the video to a different display mode. */
+    private String describeClientScaling() {
+        String mode = observedDisplayMode;
+        if (mode == null) {
+            return "unknown";
+        }
+        String modeSize = mode.substring(0, mode.indexOf('@'));
+        String streamSize = initialWidth + "x" + initialHeight;
+        return modeSize.equals(streamSize) ? "none" : streamSize + " -> " + modeSize;
+    }
+
     private static String fmtStage(PipelineStats.StageSummary stage) {
         if (stage == null || stage.count == 0) {
             return "n/a";
@@ -1936,6 +1971,13 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                 w.jitterMs,
                 fmtStage(w.stages[PipelineStats.STAGE_QUEUE_DELAY]),
                 w.bitrateMbps()));
+        if (w.frameSizeKb != null && w.frameSizeKb.count > 0) {
+            double nearCeiling = w.nearCeilingPercent();
+            sb.append('\n').append(context.getString(R.string.ull_overlay_frame_size,
+                    w.frameSizeKb.p50Ms, w.frameSizeKb.p95Ms,
+                    w.frameCeilingBytes / 1000.0,
+                    nearCeiling >= 0 ? String.format(Locale.ROOT, "%.0f%%", nearCeiling) : "n/a"));
+        }
         sb.append('\n').append(context.getString(R.string.ull_overlay_submit,
                 fmtStage(w.stages[PipelineStats.STAGE_SUBMIT]),
                 fmtStage(w.stages[PipelineStats.STAGE_JNI]),
@@ -2007,6 +2049,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         map.put("resolution", initialWidth + "x" + initialHeight);
         map.put("fps", String.valueOf(refreshRate));
         map.put("bitrate_kbps", String.valueOf(prefs.bitrate));
+        map.put("frame_ceiling_kb_estimate", String.format(Locale.ROOT, "%.1f",
+                pipelineStats.getFrameCeilingBytes() / 1000.0));
+        map.put("color_range", prefs.fullRange ? "full" : "limited");
+        map.put("display_mode", observedDisplayMode != null ? observedDisplayMode : "unknown");
+        map.put("client_scaling", describeClientScaling());
         map.put("low_latency_mode", MediaCodecHelper.lowLatencyModeName(effectiveLowLatencyMode));
         map.put("low_latency_mode_reason", lowLatencyModeReason);
         map.put("low_latency_keys", configuredLowLatencyKeys);

@@ -32,6 +32,7 @@
     <!-- Superposición de rendimiento (media / p95 del último segundo) -->
     <string name="ull_overlay_header">ULL (media / p95) · modo LL del decodificador: %1$s (%2$s)</string>
     <string name="ull_overlay_network">Red: recepción del fotograma %1$s · jitter %2$.2f ms · retardo de cola %3$s · %4$.1f Mbps</string>
+    <string name="ull_overlay_frame_size">Fotograma: %1$.0f / %2$.0f kB (p50/p95) · techo ≈ %3$.0f kB · en el techo %4$s</string>
     <string name="ull_overlay_submit">Hasta el decodificador: %1$s (nativo→Java %2$s, espera de buffer de entrada %3$s)</string>
     <string name="ull_overlay_decode">Decodificación: %1$s · fotogramas dentro del decodificador: %2$d</string>
     <string name="ull_overlay_present">Espera hasta liberar: %1$s · presentación (sistema) %2$s · reemplazados %3$.1f%%</string>
@@ -42,7 +43,7 @@
     <string name="ull_overlay_no_allm">Pantalla sin ALLM (TV: activa el Modo Juego; monitor de PC: nada que hacer)</string>
     <string name="ull_warning_no_allm">La pantalla (%1$s) no anuncia ALLM (modo juego automático). Si es un TV, activa a mano su Modo Juego: el procesado de imagen del TV puede añadir decenas de milisegundos. Los monitores de PC normalmente no procesan la imagen y no necesitan nada.</string>
     <string name="ull_display_unknown">nombre no disponible</string>
-    <string name="ull_warning_bitrate_link">%1$d Mbps (+FEC) está cerca del enlace Ethernet de %2$d Mbps: cada fotograma tarda ~%3$.1f ms en el cable y puede haber pérdidas. Se recomiendan 15–20 Mbps para 1080p60.</string>
+    <string name="ull_warning_bitrate_link">%1$d Mbps en Ethernet de %2$d Mbps: un fotograma completo (~%3$.0f kB) tarda ~%4$.1f ms en llegar (20 Mbps: ~%5$.1f ms). Prueba antes HEVC.</string>
     <string name="ull_overlay_network_congested">AVISO: cola de red sostenida. Baja el bitrate o revisa la red.</string>
 
     <!-- Diagnóstico -->
@@ -90,4 +91,6 @@
     <string name="ull_metric_client_display">1er paquete → pantalla (ms)</string>
     <string name="ull_metric_host">Procesamiento en host (ms, Sunshine)</string>
     <string name="ull_metric_resyncs">Resincronizaciones de protección</string>
+    <string name="ull_metric_frame_size_p95">Tamaño de fotograma p95 (kB)</string>
+    <string name="ull_metric_at_ceiling">Fotogramas en el techo (%)</string>
 </resources>

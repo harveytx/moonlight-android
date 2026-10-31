@@ -223,6 +223,23 @@ public final class SessionReport {
             counters.put("bitrate_mbps", round(snap.bitrateMbps()));
             root.put("counters", counters);
 
+            // ULL: frame sizes against the largest frame the host can send at this bitrate.
+            // Only frames at that ceiling would improve with a higher bitrate.
+            JSONObject frameSize = new JSONObject();
+            if (snap.frameSizeKb != null && snap.frameSizeKb.count > 0) {
+                frameSize.put("count", snap.frameSizeKb.count);
+                frameSize.put("mean_kb", round(snap.frameSizeKb.meanMs));
+                frameSize.put("p50_kb", round(snap.frameSizeKb.p50Ms));
+                frameSize.put("p95_kb", round(snap.frameSizeKb.p95Ms));
+                frameSize.put("p99_kb", round(snap.frameSizeKb.p99Ms));
+                frameSize.put("max_kb", round(snap.frameSizeKb.maxMs));
+            }
+            if (snap.frameCeilingBytes > 0) {
+                frameSize.put("ceiling_kb_estimate", round(snap.frameCeilingBytes / 1000.0));
+                frameSize.put("at_ceiling_percent", round(snap.nearCeilingPercent()));
+            }
+            root.put("frame_size_kb", frameSize);
+
             String baseName = "session-" + timestamp + "-" + prefs.latencyProfile;
             File out = new File(getDirectory(context), baseName + ".json");
             writeString(out, root.toString(2));
@@ -331,6 +348,9 @@ public final class SessionReport {
             {R.string.ull_metric_client_display, "stages_ms/client_display/mean_ms", true},
             {R.string.ull_metric_host, "stages_ms/host/mean_ms", true},
             {R.string.ull_metric_resyncs, "counters/resyncs", true},
+            // No better/worse verdict: larger frames cost receive time but carry more detail
+            {R.string.ull_metric_frame_size_p95, "frame_size_kb/p95_kb", null},
+            {R.string.ull_metric_at_ceiling, "frame_size_kb/at_ceiling_percent", null},
     };
 
     private static Double lookup(JSONObject root, String path) {
@@ -388,9 +408,13 @@ public final class SessionReport {
             String delta = "n/a";
             if (va != null && vb != null) {
                 double d = vb - va;
-                boolean lowerIsBetter = (Boolean) m[2];
-                boolean better = lowerIsBetter ? d < 0 : d > 0;
-                delta = String.format(Locale.ROOT, "%+.2f%s", d, Math.abs(d) < 0.005 ? "" : (better ? " +" : " -"));
+                Boolean lowerIsBetter = (Boolean) m[2];
+                String verdict = "";
+                if (lowerIsBetter != null && Math.abs(d) >= 0.005) {
+                    boolean better = lowerIsBetter ? d < 0 : d > 0;
+                    verdict = better ? " +" : " -";
+                }
+                delta = String.format(Locale.ROOT, "%+.2f%s", d, verdict);
             }
             sb.append(String.format(Locale.ROOT, "%-34s %9s %9s %9s%n",
                     context.getString((Integer) m[0]), fmt(va), fmt(vb), delta));

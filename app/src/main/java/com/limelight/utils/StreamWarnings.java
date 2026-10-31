@@ -10,6 +10,7 @@ import android.os.Build;
 import android.preference.PreferenceManager;
 
 import com.limelight.R;
+import com.limelight.binding.video.BitrateBudget;
 import com.limelight.preferences.PreferenceConfiguration;
 
 import java.util.ArrayList;
@@ -21,10 +22,12 @@ import java.util.List;
  */
 public final class StreamWarnings {
     private static final String ALLM_WARNING_SHOWN_PREF = "ull_allm_warning_shown";
-    // Sunshine's default FEC percentage
-    private static final double FEC_OVERHEAD = 1.2;
-    // Warn when the stream with FEC uses more than this fraction of the link
+    // Warn when the stream can use more than this fraction of the link. Sunshine fits video, FEC,
+    // audio and overhead inside the configured bitrate (see BitrateBudget), so in complex scenes
+    // the stream uses about the configured bitrate on the wire.
     private static final double LINK_USAGE_WARNING = 0.6;
+    // Reference bitrate for the comparison in the warning (Moonlight's default for 1080p60)
+    private static final int REFERENCE_BITRATE_KBPS = 20000;
 
     private StreamWarnings() {
     }
@@ -68,11 +71,16 @@ public final class StreamWarnings {
         List<String> warnings = new ArrayList<>();
 
         int linkKbps = getEthernetLinkKbps(activity);
-        if (linkKbps > 0 && prefs.bitrate * FEC_OVERHEAD > LINK_USAGE_WARNING * linkKbps) {
-            // Average time on the wire for one frame at this bitrate (including FEC)
-            double frameMs = prefs.bitrate * FEC_OVERHEAD / prefs.fps / linkKbps * 1000.0;
+        if (linkKbps > 0 && prefs.bitrate > LINK_USAGE_WARNING * linkKbps) {
+            // Time to receive a frame of the largest size the host can send at this bitrate,
+            // from the receive time measured per kB on the ZTE's 100 Mbps port
+            int channels = prefs.audioConfiguration != null ? prefs.audioConfiguration.channelCount : 2;
+            int ceilingBytes = BitrateBudget.sunshineFrameCeilingBytes(prefs.bitrate, prefs.fps, channels);
+            int referenceBytes = BitrateBudget.sunshineFrameCeilingBytes(REFERENCE_BITRATE_KBPS, prefs.fps, channels);
             warnings.add(activity.getString(R.string.ull_warning_bitrate_link,
-                    prefs.bitrate / 1000, linkKbps / 1000, frameMs));
+                    prefs.bitrate / 1000, linkKbps / 1000, ceilingBytes / 1000.0,
+                    BitrateBudget.estimateTransferMs(ceilingBytes, linkKbps),
+                    BitrateBudget.estimateTransferMs(referenceBytes, linkKbps)));
         }
 
         if (!isMinimalPostProcessingSupported(activity)) {

@@ -26,6 +26,9 @@ CSV_COLUMNS = ["receive_ms", "submit_ms", "jni_ms", "input_wait_ms", "decode_ms"
                "client_ms", "queue_delay_ms", "host_ms"]
 
 
+FRAME_SIZE_KEYS = ["p50_kb", "p95_kb", "max_kb", "ceiling_kb_estimate", "at_ceiling_percent"]
+
+
 def load(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -117,6 +120,16 @@ def main():
         vb = b.get("counters", {}).get(c)
         delta = "%+.2f" % (vb - va) if va is not None and vb is not None else "n/a"
         print("%-28s %10s %10s %10s" % (c, fmt(va), fmt(vb), delta))
+
+    # Frame sizes against the largest frame the host can send at the configured bitrate
+    # (12.2-ULL.6 and later). Only frames at that ceiling improve with more bitrate.
+    if "frame_size_kb" in a or "frame_size_kb" in b:
+        print()
+        for k in FRAME_SIZE_KEYS:
+            va = a.get("frame_size_kb", {}).get(k)
+            vb = b.get("frame_size_kb", {}).get(k)
+            delta = "%+.2f" % (vb - va) if va is not None and vb is not None else "n/a"
+            print("%-28s %10s %10s %10s" % ("frame size " + k, fmt(va), fmt(vb), delta))
 
     if "--frames" in sys.argv:
         fa, fb = load_frames(args[0]), load_frames(args[1])
