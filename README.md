@@ -1,3 +1,19 @@
+# Moonlight ULL (Ultra Low Latency) — fork for Android TV
+
+This branch is a latency-focused build of Moonlight Android for H.264 streaming from Sunshine to
+Android TV boxes (target device: ZTE ZXV10 B866V2K, Android TV 14). It installs side by side with
+the official app (`com.limelight.ull`) for A/B comparisons.
+
+* Per-device MediaCodec low latency configuration chosen by an on-device decoder benchmark
+* Latency accumulation guard, higher priority for the native video threads
+* moonlight-common-c updated to upstream (loss recovery fixes)
+* Per-stage latency statistics (ns clock), session reports, A/B comparison, capability report
+* Profiles: Ultra Low Latency (default), Balanced, Maximum quality, Original Moonlight
+
+Documentation (Spanish): [docs/ULL/README.md](docs/ULL/README.md). APK: `dist/`.
+
+---
+
 # Moonlight Android
 
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/232a8tadrrn8jv0k/branch/master?svg=true)](https://ci.appveyor.com/project/cgutman/moonlight-android/branch/master)
