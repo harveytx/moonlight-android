@@ -84,7 +84,7 @@ Lo que muestran (con sus límites):
 2. **Presentación "equilibrada" frente a "menor latencia":** retiene el fotograma ~14 ms más antes
    de liberarlo (15,3 frente a 1,1–1,8 ms de mediana). Pero, como se libera justo en el vsync, luego
    tarda menos en verse (~13 ms frente a ~20,7). **Corregido en 9.6:** la diferencia neta de
-   decodificado a pantalla es de ~6–8 ms a favor de "menor latencia", no de 14 ms.
+   decodificado a pantalla es menor que 14 ms: entre ~1 y ~8 ms según la sesión (ver 9.7).
 3. **Liberado → pantalla ≈ 20,5 ms en todas las sesiones**: es el mayor componente del cliente.
    *Interpretación*: cuadra con el plazo de presentación que reporta el sistema (13,67 ms) más medio
    refresco de media (8,3 ms) a 60 Hz, el camino SurfaceFlinger/HWC. La app no puede acortarlo con
@@ -184,7 +184,7 @@ sin explicación por ahora. En ambos casos 60 FPS tienen margen.
 2. **HEVC con la regla de seguridad (`priority-only`) decodifica en 5,5–6,9 ms**, frente a ~2,3–2,9 en
    el benchmark con baja latencia. Las sesiones fueron antes de los benchmarks, sin confirmación
    visual, así que se aplicó la regla.
-3. **Presentación: liberar al instante es ~6–8 ms mejor que "equilibrado"** en el tramo decodificado →
+3. **Presentación: liberar al instante fue ~6–8 ms mejor que "equilibrado" en estas sesiones** (en 9.7, ~1 ms en otra) en el tramo decodificado →
    pantalla: 1,8 + 20,7 ≈ 22,5 ms frente a 14,7–17,8 + 13,1 ≈ 28–31 ms.
 4. **La corrección del jitter de ULL.2 funciona**: retardo de cola p95 3–4 ms y jitter 0,1–0,4 ms por
    cable (antes, un falso p95 de ~30 ms).
@@ -214,4 +214,79 @@ Hay que confirmarlo con una sesión del perfil ULL con imagen en movimiento.
    comparar dentro de la misma app.
 4. Opcional: si el benchmark HEVC se confirma fluido, una sesión HEVC con el perfil ULL y códec "auto"
    (HEVC necesita menos bitrate para la misma calidad, es decir, menos recepción).
+
+## 9.7 Tercera ronda (ULL.3, 31-10-2026)
+
+Datos: benchmarks H.264 y HEVC con la metodología nueva, 2 sesiones largas (5,5 y 4 min) y el
+primer **CSV por fotograma** (14 928 fotogramas). La pantalla se identifica por EDID como
+**LG ULTRAGEAR** (2023), conexión directa.
+
+### Benchmark con calentamiento, 3 rondas y orden alterno
+
+| Modo | H.264 media / p95 | p95 por ronda | HEVC media / p95 | p95 por ronda |
+|---|---|---|---|---|
+| original | **2,35 / 2,68** | 2,50 / 3,00 / 2,54 | 2,63 / 3,29 | 4,88 / 2,50 / 2,48 |
+| standard | 2,65 / 3,09 | 2,54 / 2,52 / 4,20 | 2,47 / 2,97 | 3,98 / 2,48 / 2,46 |
+| vendor | 2,67 / 3,33 | 4,94 / 2,56 / 2,50 | 2,24 / 2,50 | 2,50 / 2,50 / 2,50 |
+| off | 10,41 / 11,02 | — | 5,55 / 6,59 | — |
+
+* H.264: "original" es el más rápido. Confirma, con la metodología corregida, que la configuración de
+  Moonlight ya es óptima en este firmware.
+* HEVC: "vendor" ganó en media (0,79 ms), pero no en la ronda 3 (2,50 frente a 2,48), así que la regla
+  nueva mantuvo "original". Es el comportamiento buscado: en las rondas sin incidencias todas las
+  configuraciones con baja latencia dan ~2,5 ms de p95, y las diferencias vienen de rondas sueltas con
+  picos (~4–5 ms).
+* **El "salto" que se veía al llegar el contador a 59 lo causaba el propio benchmark**, no el
+  decodificador: tras los 60 fotogramas de calentamiento (0–59) se dejaba de enviar ≥ 150 ms para
+  vaciar el decodificador. No afectaba a las medidas, que lo excluían, pero sí a la pregunta visual.
+  Una respuesta "No" descarta el resultado, y por eso el informe de capacidades de las 07:58 ya no
+  mostraba recomendación para H.264. **Corregido en ULL.4**: el envío es continuo y las estadísticas
+  se reinician sin pausa.
+
+### Sesiones
+
+| Sesión | Códec / modo LL | Presentación | Mbps reales | Hasta decodif. p50 (nativo→Java) | Decodif. p50 / p99 | Decodif.→liberado p50 | Liberado→pantalla p50 | 1er paquete→pantalla p50 |
+|---|---|---|---|---|---|---|---|---|
+| 07:52 (5,5 min) | HEVC / priority-only | máx. fluidez (inmediata) | 9,0 | 1,28 (0,02) | 5,12 / 7,74 | 1,36 | 21,50 | 31,1 |
+| 07:58 (4,2 min) | **H.264 / original** | equilibrado | 3,8 | 1,04 (0,02) | **2,38 / 4,38** | 10,28 | 13,34 | **27,1** |
+
+1. **El tramo nativo → Java (JNI) cuesta ~0,02 ms.** Todo el ~1 ms de "hasta el decodificador" es la
+   copia al buffer de entrada más `MediaCodec.queueInputBuffer()`, una llamada entre procesos al
+   servicio de códecs de Codec2. Queda confirmado con datos que eliminar copias en JNI no aportaría
+   nada (decisión de 03, ahora medida).
+2. **Picos de "hasta el decodificador":** p99 de 3,1–3,4 ms en ULL.2/ULL.3, frente a 19–38 ms en las
+   sesiones de ULL.1. En el CSV los pocos picos > 5 ms aparecen aislados (separados por 100–3000
+   fotogramas), no una vez por segundo. *Interpretación*: sacar el cálculo de estadísticas y el formato
+   del overlay del hilo de recepción eliminó los picos periódicos. Las sesiones de ULL.1 eran más
+   cortas y con escritorio estático, así que no es un A/B controlado. Moonlight original formatea su
+   overlay en ese mismo hilo cuando el overlay está activado.
+3. **Decodificación H.264 en streaming = benchmark**: p50 2,36 ms, p99 4,36 ms, p99,9 5,8 ms. No
+   depende del tamaño del fotograma (correlación −0,02).
+4. **Presentación:** en esta sesión H.264 "equilibrado" retuvo 10,3 ms (p50) y el fotograma tardó
+   13,3 ms en verse, con una dispersión mínima (p95 13,66 ms: el plazo del sistema). Con liberación
+   inmediata (sesión HEVC) fueron 1,4 + 21,5 ms. La diferencia neta fue de ~1 ms aquí, frente a 6–8 ms
+   en las sesiones HEVC de 9.6, donde "equilibrado" retenía 15–18 ms. *Interpretación*: "equilibrado"
+   puede acumular un fotograma de cola según el ritmo de llegada y la liberación inmediata no. Por eso
+   esta nunca es peor, pero su ventaja varía entre ~1 y ~8 ms.
+5. El contenido (`latency-clock.html`) comprime a ~3,8 Mbps aunque se pidan 15: sirve para medir
+   latencia, pero no el efecto del bitrate. Para eso hace falta un juego o un vídeo.
+6. **Mejor resultado medido hasta ahora: 27,1 ms (p50) del primer paquete a pantalla** (H.264,
+   configuración original, presentación "equilibrada"). Con presentación inmediata (perfil ULL) se
+   esperan entre ~1 y ~8 ms menos. Sigue faltando una sesión del perfil ULL tal cual.
+
+### Cambios en ULL.4
+
+| Cambio | Motivo |
+|---|---|
+| Benchmark: calentamiento y medida en un único flujo continuo; las estadísticas se reinician sin pausa | Salto visible en el fotograma 59 que invalidaba la comprobación visual |
+| Pregunta visual aclarada (es normal que el contador vuelva a 0 al empezar cada pasada y se pare al terminarla) | Evitar falsos "No" |
+| Informe de capacidades: tipo de conexión de la pantalla con nombre | Legibilidad |
+
+### Próximas pruebas (ULL.4)
+
+1. Benchmark H.264 y HEVC una vez cada uno. Si el contador va fluido dentro de cada pasada, contesta
+   "Sí": en HEVC eso permite usar la baja latencia (~2,5 ms en lugar de ~5 ms).
+2. **Perfil "Ultra Low Latency" sin tocar nada más** (H.264, presentación inmediata), con un juego o
+   vídeo en movimiento, 2–3 sesiones de ≥ 1 min con CSV por fotograma.
+3. Mismo contenido con el perfil "Moonlight original" para la comparación directa.
 

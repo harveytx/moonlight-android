@@ -4,13 +4,13 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación (versión 12.2-ULL.3).**
+> **Estado de la validación (versión 12.2-ULL.4).**
 > Compila, el APK se genera y los 32 tests unitarios pasan. Medidas reales en el ZTE
 > ([09-resultados-zte.md](09-resultados-zte.md)): SoC S905Y4 confirmado. En este equipo, la
 > configuración de decodificador de Moonlight original ya es óptima (H.264 1080p ≈ 2,3 ms con
 > `low-latency=1`). La mejora de "standard" que se anunció en ULL.2 **no se reprodujo** y se ha
 > retirado. Lo que sí está medido: el bitrate cuesta ~0,19 ms de recepción por Mbps en el Ethernet de
-> 100 Mbps, y liberar el fotograma al instante ahorra ~6–8 ms frente a "equilibrado".
+> 100 Mbps, y liberar el fotograma al instante nunca es peor que "equilibrado" (entre ~1 y ~8 ms mejor según la sesión).
 > **Aún no hay una sesión del perfil ULL con imagen en movimiento** ni una comparación con la app
 > oficial. No se declara ninguna reducción de latencia que no esté medida.
 
@@ -32,8 +32,8 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.3.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.3.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.4.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.4.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
