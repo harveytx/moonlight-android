@@ -59,6 +59,9 @@ public class DecoderBenchmark {
         public String error;
         // p95 decode time of each round, in execution order of the rounds
         public final List<Double> roundP95Ms = new ArrayList<>();
+        // Fraction of rendered frames that Android reported as displayed, per round
+        public final List<Double> roundDisplayedRatio = new ArrayList<>();
+        public double displayedPercent = -1;
     }
 
     public static class Result {
@@ -192,6 +195,24 @@ public class DecoderBenchmark {
         return needIdr;
     }
 
+    // Waits until the frame-rendered callbacks stop arriving (at most 1 s)
+    private static void waitForDisplayCallbacks(PipelineStats stats) {
+        long lastCount = -1;
+        long lastChange = System.nanoTime();
+        long deadline = lastChange + 1_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            long count = stats.getTotalFramesDisplayed();
+            if (count != lastCount) {
+                lastCount = count;
+                lastChange = System.nanoTime();
+            }
+            else if (System.nanoTime() - lastChange > 200_000_000L) {
+                break;
+            }
+            LockSupport.parkNanos(10_000_000L);
+        }
+    }
+
     // Waits until the decoder stops producing frames; returns the time of the last change
     private static long waitForDrain(PipelineStats stats) {
         long lastCount = -1;
@@ -286,6 +307,9 @@ public class DecoderBenchmark {
             // are normal steady-state samples.
             cr.idrRequests = feed(renderer, clip, cursor, WARMUP_FRAMES + MEASURE_FRAMES, true, WARMUP_FRAMES);
             waitForDrain(renderer.getPipelineStats());
+            // Frame-rendered callbacks may be delayed or batched by the framework; counting them
+            // too early made some rounds look like they displayed only 40-45 FPS
+            waitForDisplayCallbacks(renderer.getPipelineStats());
             PipelineStats.Snapshot s = renderer.getPipelineStats().getSessionSnapshot(System.nanoTime());
 
             PipelineStats.StageSummary decode = s.stages[PipelineStats.STAGE_DECODE];
@@ -301,10 +325,15 @@ public class DecoderBenchmark {
             if (renderer.isDisplayTimeReported() && s.counters.framesDisplayed > 0) {
                 cr.displayedFps = s.fps(s.counters.framesDisplayed);
                 cr.displayMeanMs = s.stages[PipelineStats.STAGE_DISPLAY].meanMs;
+                if (s.counters.framesRendered > 0) {
+                    cr.roundDisplayedRatio.add(Math.min(1.0,
+                            (double) s.counters.framesDisplayed / s.counters.framesRendered));
+                }
             }
             cr.rounds = 1;
 
-            double expectedDisplayFps = Math.min(FPS, displayRefreshRate > 0 ? displayRefreshRate : FPS);
+            // The display check is done on the median of all rounds (see checkDisplayedFrames):
+            // a single round with late callbacks or vsync collisions must not invalidate a mode
             if (rendererFailure != null) {
                 cr.valid = false;
                 cr.error = rendererFailure;
@@ -316,10 +345,6 @@ public class DecoderBenchmark {
             else if (cr.idrRequests > 0) {
                 cr.valid = false;
                 cr.error = cr.idrRequests + " decoder errors (IDR requested)";
-            }
-            else if (cr.displayedFps >= 0 && cr.displayedFps < 0.8 * expectedDisplayFps) {
-                cr.valid = false;
-                cr.error = String.format(Locale.ROOT, "only %.1f FPS displayed", cr.displayedFps);
             }
         } catch (RuntimeException e) {
             cr.valid = false;
@@ -379,6 +404,7 @@ public class DecoderBenchmark {
         }
         into.idrRequests += r.idrRequests;
         into.roundP95Ms.addAll(r.roundP95Ms);
+        into.roundDisplayedRatio.addAll(r.roundDisplayedRatio);
         into.valid &= r.valid;
         if (into.error == null) {
             into.error = r.error;
@@ -455,6 +481,7 @@ public class DecoderBenchmark {
                 return result;
             }
             for (ConfigResult r : merged) {
+                checkDisplayedFrames(r);
                 result.configs.add(r);
             }
 
@@ -539,6 +566,34 @@ public class DecoderBenchmark {
         result.recommendationReason = best == original ? "original is fastest" : "original configuration failed";
     }
 
+    static double median(List<Double> values) {
+        if (values.isEmpty()) {
+            return -1;
+        }
+        List<Double> sorted = new ArrayList<>(values);
+        java.util.Collections.sort(sorted);
+        int n = sorted.size();
+        return n % 2 == 1 ? sorted.get(n / 2) : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2;
+    }
+
+    /**
+     * Rejects a configuration that doesn't show the frames it decodes (the Amlogic HEVC
+     * "slideshow" shows a few frames per second, i.e. well under 50 % of them). Uses the median
+     * over rounds: one round with delayed frame-rendered callbacks, or frames replaced because
+     * two landed in the same vsync, must not fail an otherwise good configuration.
+     */
+    static void checkDisplayedFrames(ConfigResult r) {
+        double ratio = median(r.roundDisplayedRatio);
+        if (ratio < 0) {
+            return; // Not reported by this device
+        }
+        r.displayedPercent = 100.0 * ratio;
+        if (r.valid && ratio < 0.5) {
+            r.valid = false;
+            r.error = String.format(Locale.ROOT, "only %.0f%% of frames displayed", r.displayedPercent);
+        }
+    }
+
     private static boolean fasterInEveryRound(ConfigResult candidate, ConfigResult original) {
         if (candidate.roundP95Ms.isEmpty() || candidate.roundP95Ms.size() != original.roundP95Ms.size()) {
             // No per-round data to check
@@ -558,9 +613,10 @@ public class DecoderBenchmark {
                         "(alternating order, after a discarded warm-up run)%n",
                 result.decoderName, hevc ? "HEVC" : "H.264", result.width, result.height, result.fps,
                 WARMUP_FRAMES, MEASURE_FRAMES, ROUNDS));
-        sb.append(String.format(Locale.ROOT, "Display refresh: %.2f Hz%n%n", displayRefreshRate));
+        sb.append(String.format(Locale.ROOT, "App version: %s, display refresh: %.2f Hz%n%n",
+                com.limelight.BuildConfig.VERSION_NAME, displayRefreshRate));
         sb.append(String.format(Locale.ROOT, "%-9s %-7s %-7s %-7s %-7s %-6s %-7s %-7s %-16s %s%n",
-                "mode", "mean", "p50", "p95", "max", "out%", "dispFPS", "dispMs", "p95 per round", "status / keys"));
+                "mode", "mean", "p50", "p95", "max", "out%", "disp%", "dispMs", "p95 per round", "status / keys"));
         for (ConfigResult r : result.configs) {
             StringBuilder rounds = new StringBuilder();
             for (Double p95 : r.roundP95Ms) {
@@ -572,7 +628,7 @@ public class DecoderBenchmark {
             sb.append(String.format(Locale.ROOT, "%-9s %-7.2f %-7.2f %-7.2f %-7.2f %-6.1f %-7s %-7s %-16s %s%n",
                     MediaCodecHelper.lowLatencyModeName(r.mode),
                     r.decodeMeanMs, r.decodeP50Ms, r.decodeP95Ms, r.decodeMaxMs, r.decodedPercent,
-                    r.displayedFps >= 0 ? String.format(Locale.ROOT, "%.1f", r.displayedFps) : "n/a",
+                    r.displayedPercent >= 0 ? String.format(Locale.ROOT, "%.0f", r.displayedPercent) : "n/a",
                     r.displayMeanMs >= 0 ? String.format(Locale.ROOT, "%.2f", r.displayMeanMs) : "n/a",
                     rounds,
                     (r.valid ? "OK" : "FAIL: " + r.error) + " | " + r.keys));
@@ -593,6 +649,8 @@ public class DecoderBenchmark {
                     result.maxThroughputFps >= 144 ? "OK" : "NOT sustainable"));
         }
         sb.append("\nDecode = queueInputBuffer() -> dequeueOutputBuffer(); measured with System.nanoTime().\n")
+                .append("disp% = rendered frames reported as displayed by Android (median of the rounds; frames replaced\n")
+                .append("by a newer one within the same vsync are not displayed). Below 50 % the mode is rejected.\n")
                 .append("dispMs = release -> display time reported by Android (OnFrameRenderedListener), if supported.\n")
                 .append("dispMs depends on the phase between the feed timer and vsync (it can differ by up to one\n")
                 .append("refresh between runs), so it is NOT used to compare configurations.\n")

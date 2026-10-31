@@ -3,6 +3,7 @@
 # (e.g. ZTE ZXV10 B866V2K). Requires adb with USB or network debugging enabled:
 #   adb connect <tv-box-ip>:5555
 # Usage: tools/collect-diagnostics.sh [output-dir]
+# The app keeps one report folder per version: ull-sessions/<version>/ (all are pulled).
 set -u
 OUT=${1:-ull-diagnostics-$(date +%Y%m%d-%H%M%S)}
 PKG=${PKG:-com.limelight.ull}

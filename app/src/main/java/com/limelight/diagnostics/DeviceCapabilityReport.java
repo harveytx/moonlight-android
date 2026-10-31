@@ -381,7 +381,8 @@ public final class DeviceCapabilityReport {
         MediaCodecHelper.initialize(activity, glPrefs.glRenderer);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Moonlight ULL device capability report\n\n");
+        sb.append("Moonlight ULL device capability report\n");
+        sb.append("App version: ").append(com.limelight.BuildConfig.VERSION_NAME).append("\n\n");
         appendSystem(sb, activity, glPrefs.glRenderer);
         appendDisplay(sb, activity);
         appendNetwork(sb, activity);

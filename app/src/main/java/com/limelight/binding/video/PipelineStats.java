@@ -433,6 +433,16 @@ public class PipelineStats {
         }
     }
 
+    public synchronized long getTotalFramesDisplayed() {
+        synchronized (globalLock) {
+            long total = globalCounters.framesDisplayed + windowCounters.framesDisplayed;
+            if (closingCounters != null && closingGeneration == generation) {
+                total += closingCounters.framesDisplayed;
+            }
+            return total;
+        }
+    }
+
     public synchronized long getDecoderInFlight() {
         return inFlight;
     }

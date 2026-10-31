@@ -23,7 +23,6 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +35,11 @@ import java.util.Map;
  *
  * Files live in the app-specific external storage directory, which needs no permission and
  * can be pulled with: adb pull /sdcard/Android/data/<package>/files/ull-sessions
+ *
+ * Every app version writes into its own subfolder (ull-sessions/<versionName>/) so results of
+ * different builds are never mixed up. Files written by versions before 12.2-ULL.5 directly
+ * into ull-sessions/ are moved once: session reports into the folder of the version recorded
+ * inside them, everything else (which has no version information) into "unversioned".
  */
 public final class SessionReport {
     private static final String DIRECTORY = "ull-sessions";
@@ -44,7 +48,11 @@ public final class SessionReport {
     private SessionReport() {
     }
 
-    public static File getDirectory(Context context) {
+    private static final String UNVERSIONED_DIRECTORY = "unversioned";
+    private static boolean legacyFilesMigrated;
+
+    /** ull-sessions/, which contains one folder per app version. */
+    public static File getRootDirectory(Context context) {
         File base = context.getExternalFilesDir(null);
         if (base == null) {
             base = context.getFilesDir();
@@ -53,6 +61,74 @@ public final class SessionReport {
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
+    }
+
+    /** Folder of the running app version, where new reports are written. */
+    public static File getDirectory(Context context) {
+        File root = getRootDirectory(context);
+        migrateLegacyFiles(root);
+        File dir = new File(root, versionFolderName(BuildConfig.VERSION_NAME));
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir;
+    }
+
+    static String versionFolderName(String versionName) {
+        if (versionName == null || versionName.isEmpty()) {
+            return UNVERSIONED_DIRECTORY;
+        }
+        // Keep it a single, portable path component
+        return versionName.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    // Moves report files that older versions wrote directly into ull-sessions/
+    private static synchronized void migrateLegacyFiles(File root) {
+        if (legacyFilesMigrated) {
+            return;
+        }
+        legacyFilesMigrated = true;
+
+        File[] files = root.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            String name = f.getName();
+            if (!f.isFile() || !name.endsWith(".json") || !name.startsWith("session-")) {
+                continue;
+            }
+            String version = UNVERSIONED_DIRECTORY;
+            try {
+                version = versionFolderName(load(f).optString("app_version", ""));
+            } catch (IOException | JSONException e) {
+                LimeLog.warning("Unreadable session report " + name + ": " + e);
+            }
+            File target = new File(root, version);
+            //noinspection ResultOfMethodCallIgnored
+            target.mkdirs();
+            //noinspection ResultOfMethodCallIgnored
+            f.renameTo(new File(target, name));
+            File csv = new File(root, name.substring(0, name.length() - ".json".length()) + "-frames.csv");
+            if (csv.isFile()) {
+                //noinspection ResultOfMethodCallIgnored
+                csv.renameTo(new File(target, csv.getName()));
+            }
+        }
+
+        // Capability and benchmark reports of older versions carry no version information
+        files = root.listFiles();
+        if (files == null) {
+            return;
+        }
+        File unversioned = new File(root, UNVERSIONED_DIRECTORY);
+        for (File f : files) {
+            if (f.isFile()) {
+                //noinspection ResultOfMethodCallIgnored
+                unversioned.mkdirs();
+                //noinspection ResultOfMethodCallIgnored
+                f.renameTo(new File(unversioned, f.getName()));
+            }
+        }
     }
 
     private static JSONObject stageJson(PipelineStats.StageSummary s) throws JSONException {
@@ -190,18 +266,27 @@ public final class SessionReport {
     }
 
     /** Session reports, newest first. */
+    /** Session reports of all versions, newest first (A/B comparisons may span versions). */
     public static List<File> list(Context context) {
-        File[] files = getDirectory(context).listFiles();
+        getDirectory(context); // Migrates legacy files if needed
         List<File> result = new ArrayList<>();
-        if (files == null) {
+        File[] versionDirs = getRootDirectory(context).listFiles();
+        if (versionDirs == null) {
             return result;
         }
-        Arrays.sort(files, (a, b) -> b.getName().compareTo(a.getName()));
-        for (File f : files) {
-            if (f.getName().startsWith("session-") && f.getName().endsWith(".json")) {
-                result.add(f);
+        for (File dir : versionDirs) {
+            File[] files = dir.isDirectory() ? dir.listFiles() : null;
+            if (files == null) {
+                continue;
+            }
+            for (File f : files) {
+                if (f.getName().startsWith("session-") && f.getName().endsWith(".json")) {
+                    result.add(f);
+                }
             }
         }
+        // File names start with the timestamp, so this sorts by time across folders
+        java.util.Collections.sort(result, (a, b) -> b.getName().compareTo(a.getName()));
         return result;
     }
 
@@ -213,7 +298,9 @@ public final class SessionReport {
         JSONObject settings = report.optJSONObject("settings");
         JSONObject decoder = report.optJSONObject("decoder");
         StringBuilder sb = new StringBuilder();
-        sb.append(report.optString("timestamp")).append("  [").append(settings != null ? settings.optString("profile") : "?").append("]  ");
+        sb.append(report.optString("timestamp"))
+                .append("  v").append(report.optString("app_version", "?"))
+                .append("  [").append(settings != null ? settings.optString("profile") : "?").append("]  ");
         if (settings != null) {
             sb.append(settings.optString("resolution")).append('@').append(settings.optInt("fps"))
                     .append(' ').append(settings.optInt("bitrate_kbps") / 1000.0).append(" Mbps");

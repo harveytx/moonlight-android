@@ -78,4 +78,34 @@ public class DecoderBenchmarkRecommendationTest {
         DecoderBenchmark.chooseRecommendation(result);
         assertEquals(MediaCodecHelper.LOW_LATENCY_MODE_STANDARD, result.recommended.mode);
     }
+
+    @Test
+    public void oneBadDisplayRoundDoesNotFailAMode() {
+        // Like the ZTE runs: 44 % displayed in one round because of late callbacks, ~97 % otherwise
+        DecoderBenchmark.ConfigResult r = config(MediaCodecHelper.LOW_LATENCY_MODE_VENDOR, 2.5, true);
+        r.roundDisplayedRatio.add(0.97);
+        r.roundDisplayedRatio.add(0.44);
+        r.roundDisplayedRatio.add(0.96);
+        DecoderBenchmark.checkDisplayedFrames(r);
+        assertEquals(true, r.valid);
+        assertEquals(96.0, r.displayedPercent, 1e-9);
+    }
+
+    @Test
+    public void slideshowIsRejected() {
+        // Amlogic HEVC slideshow: decodes everything but shows a few frames per second
+        DecoderBenchmark.ConfigResult r = config(MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL, 2.5, true);
+        r.roundDisplayedRatio.add(0.05);
+        r.roundDisplayedRatio.add(0.08);
+        r.roundDisplayedRatio.add(0.95);
+        DecoderBenchmark.checkDisplayedFrames(r);
+        assertEquals(false, r.valid);
+    }
+
+    @Test
+    public void medianOfEvenAndOddLists() {
+        assertEquals(2.0, DecoderBenchmark.median(java.util.Arrays.asList(3.0, 1.0, 2.0)), 1e-9);
+        assertEquals(2.5, DecoderBenchmark.median(java.util.Arrays.asList(4.0, 1.0, 2.0, 3.0)), 1e-9);
+        assertEquals(-1.0, DecoderBenchmark.median(new java.util.ArrayList<Double>()), 1e-9);
+    }
 }
