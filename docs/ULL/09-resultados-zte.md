@@ -632,10 +632,43 @@ de Windows (el texto necesita la captura del propio PC):
 * Lo que se pierde es el **color fino**, por el croma 4:2:0 que el ZTE no puede evitar. Las líneas de
   color de 1 px se mezclan; en las rojas/azules, que casi solo se distinguen por el color, se pierde
   hasta la diferencia de luma.
-* Hay además un desplazamiento de nivel pequeño y constante (+2 a +3 niveles de luma). Está
-  pendiente de explicar: puede venir de las conversiones de rango.
+* El desplazamiento de nivel (+2 a +3 niveles de luma) que aparecía frente a la referencia generada
+  en Linux **no existe frente a la captura real del PC** (ver abajo: diferencia 0,0–0,3). Venía de la
+  referencia: en Windows el navegador gestiona el color del monitor y el escritorio no tiene
+  exactamente los valores del lienzo.
 * En la nitidez de este análisis, la medida ya no usa el filtro Sobel, que da cero en patrones de
   1 px, sino diferencias entre píxeles vecinos. El mismo cambio está en `compare-captures.html`.
+
+### Comparación con capturas del PC (imágenes enviadas por el chat)
+
+El usuario envió dos capturas del PC y dos de Moonlight. Identificación, comparando con los PNG de
+las capturas del ZTE:
+
+| Imagen | Qué es |
+|---|---|
+| 1 | Captura del PC del patrón (fotograma 3541) |
+| 2 | Captura de Moonlight `125026` (fotograma 17061) |
+| 3 | Captura de Moonlight `125339` (juego en vivo) |
+| 4 | Captura del PC de un vídeo de 1280×720 en pausa; es el mismo fotograma que la captura de Moonlight `125909` |
+
+Las imágenes del chat llegan recomprimidas (WebP con pérdida), así que las cifras son aproximadas:
+
+| Pareja con el mismo contenido | Zona | Nitidez | SSIM | Diferencia de nivel |
+|---|---|---|---|---|
+| Patrón: PC (1) frente a Moonlight (2) | Texto negro sobre blanco | 100,2 % | 0,9996 | 0,0 |
+| | Rejillas de 1 px | 100,3 % | 0,9998 | +0,2 |
+| | Texto de color | 98,5 % | 0,973 | −0,2 |
+| | Escalones de negro y blanco | 98,4 % | 0,997 | +0,3 |
+| Vídeo en pausa: PC (4) frente a Moonlight `125909` | Escena | 96–98 % | 0,95–0,96 | **+13** |
+
+* **El texto en blanco y negro sale igual de nítido que en el PC.** Lo único que se ve distinto en el
+  patrón son los bordes del texto de color, por el croma 4:2:0.
+* **Las imágenes 3 y 4 no muestran lo mismo.** La 4 es más borrosa porque es un vídeo de 720p
+  ampliado, no por Moonlight. Frente a su pareja real (`125909`), la nitidez es del 96–98 %.
+* **En el vídeo en pausa, la captura de Moonlight sale unos 13 niveles más clara** que la captura
+  del PC. En el patrón no hay diferencia, así que apunta a cómo dibuja el vídeo el reproductor del PC
+  (probablemente una capa de vídeo o un rango distinto en pantalla completa). Pendiente de comprobar
+  con el reproductor en ventana o con el juego en pausa.
 
 ### Cambios en ULL.8
 
