@@ -16,6 +16,7 @@ import com.limelight.binding.input.virtual_controller.VirtualController;
 import com.limelight.binding.video.CrashListener;
 import com.limelight.binding.video.MediaCodecDecoderRenderer;
 import com.limelight.diagnostics.SessionReport;
+import com.limelight.diagnostics.StreamCapture;
 import com.limelight.binding.video.MediaCodecHelper;
 import com.limelight.binding.video.PerfOverlayListener;
 import com.limelight.nvstream.NvConnection;
@@ -140,6 +141,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean waitingForAllModifiersUp = false;
     private int specialKeyCode = KeyEvent.KEYCODE_UNKNOWN;
     private StreamView streamView;
+    // ULL: periodic captures of the decoded video (diagnostics option)
+    private StreamCapture streamCapture;
     private long lastAbsTouchUpTime = 0;
     private long lastAbsTouchDownTime = 0;
     private float lastAbsTouchUpX, lastAbsTouchUpY;
@@ -1043,6 +1046,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        if (streamCapture != null) {
+            streamCapture.stop();
+            streamCapture = null;
+        }
 
         if (controllerHandler != null) {
             controllerHandler.destroy();
@@ -2250,13 +2258,19 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // during the process of stopping this one.
             final MediaCodecDecoderRenderer renderer = decoderRenderer;
             final PreferenceConfiguration sessionPrefs = prefConfig;
+            final StreamCapture capture = streamCapture;
+            streamCapture = null;
+            if (capture != null) {
+                capture.stop();
+            }
             new Thread() {
                 public void run() {
                     conn.stop();
 
                     // ULL: the decoder is stopped now, so the session statistics are final
                     if (sessionPrefs.recordSessions && renderer != null) {
-                        SessionReport.save(Game.this, renderer, sessionPrefs, pcName, appName);
+                        SessionReport.save(Game.this, renderer, sessionPrefs, pcName, appName,
+                                capture != null ? capture.getResults() : null);
                     }
                 }
             }.start();
@@ -2416,6 +2430,32 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         });
     }
 
+    // ULL: runs on the UI thread once the stream is connected
+    private void startStreamCapture() {
+        if (prefConfig.captureIntervalSec <= 0 || streamCapture != null || !StreamCapture.isSupported()) {
+            return;
+        }
+        final MediaCodecDecoderRenderer renderer = decoderRenderer;
+        streamCapture = new StreamCapture(this, streamView, prefConfig.width, prefConfig.height,
+                prefConfig.captureIntervalSec,
+                new StreamCapture.LabelProvider() {
+                    @Override
+                    public String getCaptureLabel() {
+                        return renderer.getCaptureLabel();
+                    }
+                },
+                new StreamCapture.FirstResultListener() {
+                    @Override
+                    public void onFirstCapture(int status, String detail) {
+                        int message = status == StreamCapture.STATUS_OK ? R.string.ull_capture_first_ok :
+                                status == StreamCapture.STATUS_BLACK ? R.string.ull_capture_first_black :
+                                        R.string.ull_capture_first_failed;
+                        displayTransientMessage(getString(message, detail));
+                    }
+                });
+        streamCapture.start();
+    }
+
     @Override
     public void connectionStarted() {
         // ULL: the native video threads exist now, so raise their priority if requested
@@ -2433,6 +2473,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 connected = true;
                 connecting = false;
                 updatePipAutoEnter();
+
+                // ULL: captures of the decoded video, to compare its sharpness with the PC
+                startStreamCapture();
 
                 // Hide the mouse cursor now after a short delay.
                 // Doing it before dismissing the spinner seems to be undone

@@ -23,6 +23,11 @@
     <string name="summary_ull_record_sessions">Guarda un informe de latencia por etapas tras cada transmisión para comparar configuraciones</string>
     <string name="title_ull_frame_log">Registro CSV por fotograma</string>
     <string name="summary_ull_frame_log">Guarda también los tiempos de cada fotograma (hasta 10 minutos por sesión)</string>
+    <string name="title_ull_capture_interval">Capturas del vídeo para comparar la imagen</string>
+    <string name="summary_ull_capture_interval">Guarda el fotograma decodificado como PNG en la carpeta de informes (ull-sessions/&lt;versión&gt;/) para compararlo con capturas del PC. No incluye el procesado de imagen del propio ZTE. Desactívalo para medir latencia.</string>
+    <string name="ull_capture_first_ok">Captura del vídeo guardada: %1$s</string>
+    <string name="ull_capture_first_black">La captura del vídeo sale negra: este equipo no deja leer el vídeo a las apps (%1$s)</string>
+    <string name="ull_capture_first_failed">La captura del vídeo falló: %1$s</string>
     <string name="title_ull_restore_defaults">Restaurar valores predeterminados</string>
     <string name="summary_ull_restore_defaults">Vuelve a aplicar el perfil Ultra Low Latency y restablece los ajustes avanzados de latencia</string>
     <string name="ull_restore_confirm">¿Restaurar los ajustes de latencia predeterminados? No se modifican los ajustes de mando, entrada ni interfaz.</string>

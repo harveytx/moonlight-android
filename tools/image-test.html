@@ -17,7 +17,12 @@
   5. Noise (N): worst case that fills every frame up to the size limit, to measure what a
      bitrate costs on the network (receive time, losses), not to judge image quality.
 
-  Keys: M motion, N noise size, P pause, H help, F full screen.
+  Every frame is a pure function of its number (60 per second whatever the monitor's refresh
+  rate), shown in the header. To compare a capture taken by Moonlight ULL with the original,
+  press G, type the frame number seen in the capture, and take a screenshot of the PC: it shows
+  exactly the same content. The page can also be opened as image-test.html?frame=1234.
+
+  Keys: M motion, N noise size, P pause, G go to frame, H help, F full screen.
 -->
 <html>
 <head>
@@ -38,6 +43,8 @@ let W = 0, H = 0, dpr = 1;
 let staticLayer = null, textLayer = null, textureLayer = null;
 let motion = true, paused = false, help = true, noiseStep = 0, frame = 0;
 const NOISE_SIZES = [0, 256, 512, 768];
+const CONTENT_FPS = 60; // content frames per second, independent of the display refresh rate
+let frameBase = 0, timeBase = performance.now();
 let fpsFrames = 0, fpsStart = performance.now(), fps = 0;
 let seed = 0x9e3779b9;
 
@@ -187,7 +194,9 @@ function buildMotionLayers(L) {
     if (t.measureText(test).width > tw - 12) { t.fillText(line, 6, y); y += lineH; line = word; }
     else line = test;
   }
-  // Detailed texture (value noise at several scales), panned like a camera
+  // Detailed texture (value noise at several scales), panned like a camera. Same seed every
+  // time, so the texture only depends on the screen size
+  seed = 0x9e3779b9;
   const xw = Math.ceil(L.motionW / 2) + 1024, xh = L.motionH;
   textureLayer = newLayer(xw, xh);
   const x = textureLayer.getContext("2d");
@@ -233,7 +242,8 @@ function drawHeader(L) {
   label(ctx, `Patrón de imagen ULL - pantalla ${W}x${H} px físicos (escala de Windows ${Math.round(dpr * 100)} %) - ` +
     `fotograma ${frame} - ${fps.toFixed(0)} FPS` + (paused ? " - PAUSA" : ""), L.pad, px(10 * L.s), 18 * L.s, "#fff");
   label(ctx, "Teclas: M movimiento " + (motion ? "sí" : "no") + ", N ruido " +
-    (NOISE_SIZES[noiseStep] ? NOISE_SIZES[noiseStep] + " px" : "no") + ", P pausa, H ayuda, F pantalla completa",
+    (NOISE_SIZES[noiseStep] ? NOISE_SIZES[noiseStep] + " px" : "no") +
+    ", P pausa, G ir a un fotograma, H ayuda, F pantalla completa",
     L.pad, px(34 * L.s), 14 * L.s);
 }
 
@@ -250,6 +260,7 @@ function drawMotion(L) {
   const n = Math.min(NOISE_SIZES[noiseStep], L.motionW, L.motionH);
   if (n > 0) {
     const img = ctx.createImageData(n, n), d32 = new Uint32Array(img.data.buffer);
+    seed = (Math.imul(frame + 1, 2654435761) >>> 0) || 1; // same noise for the same frame
     for (let k = 0; k < d32.length; k++) d32[k] = rand() | 0xff000000;
     ctx.putImageData(img, L.motionX + L.motionW - n, L.motionY + L.motionH - n);
   }
@@ -265,6 +276,8 @@ function drawHelp(L) {
     "4. Movimiento: compara bitrates/códecs en el texto que se desplaza y en la textura. Mira en el overlay de",
     "   Moonlight ULL 'Fotograma ... en el techo X %': si es bajo, subir el bitrate no cambia la imagen.",
     "5. Ruido (N): peor caso; llena cada fotograma hasta el techo para medir el coste de red de un bitrate.",
+    "6. Comparar con una captura de Moonlight ULL: pulsa G, escribe el número de fotograma de la captura y haz",
+    "   una captura del PC (Win+ImprPant): muestra exactamente el mismo contenido. Oculta esta ayuda (H) en ambas.",
   ];
   const x = L.pad, y = L.motionY, w = L.motionX - 2 * L.pad, lh = px(22 * L.s);
   ctx.fillStyle = "rgba(0,0,0,0.85)";
@@ -272,10 +285,27 @@ function drawHelp(L) {
   lines.forEach((t, i) => label(ctx, t, x + px(10 * L.s), y + px(8 * L.s) + i * lh, 14 * L.s, "#ddd"));
 }
 
+function contentFrame(now) {
+  return frameBase + Math.floor((now - timeBase) * CONTENT_FPS / 1000);
+}
+
+function setPaused(p) {
+  const now = performance.now();
+  if (p && !paused) frame = contentFrame(now);
+  if (!p && paused) { frameBase = frame; timeBase = now; }
+  paused = p;
+}
+
+function goToFrame(n) {
+  if (!Number.isFinite(n) || n < 0) return;
+  paused = true;
+  frame = Math.floor(n);
+}
+
 function tick() {
   if (W && staticLayer) {
     const L = layout();
-    if (!paused) frame++;
+    if (!paused) frame = contentFrame(performance.now());
     ctx.drawImage(staticLayer, 0, 0);
     drawHeader(L);
     drawMotion(L);
@@ -314,10 +344,13 @@ addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (k === "m") motion = !motion;
   else if (k === "n") noiseStep = (noiseStep + 1) % NOISE_SIZES.length;
-  else if (k === "p" || k === " ") paused = !paused;
+  else if (k === "p" || k === " ") setPaused(!paused);
+  else if (k === "g") goToFrame(Number(prompt("Fotograma (número que aparece en la captura):", String(frame))));
   else if (k === "h") help = !help;
   else if (k === "f") { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
 });
+const startFrame = Number(new URLSearchParams(location.search).get("frame"));
+if (new URLSearchParams(location.search).has("frame")) goToFrame(startFrame);
 requestAnimationFrame(tick);
 </script>
 </body>

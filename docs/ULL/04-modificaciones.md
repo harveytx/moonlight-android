@@ -38,14 +38,15 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `diagnostics/DecoderBenchmark.java`, `DecoderBenchmarkActivity.java` | Benchmark del decodificador en el equipo. |
 | `diagnostics/AnnexBClip.java` | Divide un flujo Annex B en unidades como las entrega moonlight-common-c. |
 | `diagnostics/SessionReport.java` | Informes JSON/CSV, listado, texto legible y comparación A/B. |
+| `diagnostics/StreamCapture.java` | Capturas periódicas del fotograma decodificado (PixelCopy → PNG) para comparar con el PC (ULL.7). |
 | `res/layout/activity_ull_diagnostics.xml`, `activity_ull_decoder_benchmark.xml` | Interfaces. |
 | `res/values/strings_ull.xml`, `arrays_ull.xml` (+ `values-es`) | Textos en inglés y español. |
 | `assets/bench/h264_1080p60.h264`, `hevc_1080p60.h265` | Clips sintéticos de 120 fotogramas con contador visible (generados con `tools/generate-bench-clips.sh`). |
-| `app/src/test/...` (8 clases, 43 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser, recomendación, informes y presupuesto de bitrate. |
-| `tools/*` | Reloj de latencia, patrón de imagen, script adb, comparador de sesiones, generador de clips. |
+| `app/src/test/...` (10 clases, 46 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser, recomendación, informes, presupuesto de bitrate y capturas. |
+| `tools/*` | Reloj de latencia, patrón de imagen, comparador de capturas, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.6.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.7.apk` | APK compilado (release, R8). |
 
 ## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
 
@@ -103,7 +104,21 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `app/build.gradle` | Versión `12.2-ULL.6` (31506). |
 | Tests | 43 (nuevos: `BitrateBudgetTest`, tamaños de fotograma en `PipelineStatsTest`). |
 
-## 4.8 Compatibilidad
+## 4.8 Versión 12.2-ULL.7
+
+| Archivo | Cambio |
+|---|---|
+| `diagnostics/StreamCapture.java` (nuevo) | Cada N s (10/30/60) copia el último fotograma decodificado del `SurfaceView` con `PixelCopy` (API 24+) a un bitmap del tamaño del stream y lo guarda como PNG en `ull-sessions/<versión>/` desde un hilo de prioridad baja. La primera captura llega a los 5 s y avisa si funcionó, falló o salió negra. |
+| `preferences/PreferenceConfiguration.java`, `LatencyProfile.java`, `res/xml/preferences.xml`, arrays y strings | Opción "Capturas del vídeo para comparar la imagen" (desactivada por defecto; "Restaurar" la desactiva). |
+| `Game.java` | Inicia las capturas al conectar y las detiene al parar; pasa el resultado al informe. |
+| `binding/video/MediaCodecDecoderRenderer.java` | `getCaptureLabel()` (códec y bitrate para el nombre del archivo). |
+| `diagnostics/SessionReport.java` | `captures` y `capture_interval_s` en el informe; carpeta creada de forma segura desde varios hilos. |
+| `tools/image-test.html` | Fotogramas deterministas a 60 por segundo con cualquier refresco del monitor; G / `?frame=N` para reproducir un fotograma exacto. |
+| `tools/compare-captures.html` (nuevo) | Comparación de capturas ZTE / PC. |
+| `app/build.gradle` | Versión `12.2-ULL.7` (31507). |
+| Tests | 46 (nuevos: `StreamCaptureTest`, `CaptureIntervalTest`). |
+
+## 4.9 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

@@ -23,6 +23,11 @@
     <string name="summary_ull_record_sessions">Save a per-stage latency report after every stream so configurations can be compared</string>
     <string name="title_ull_frame_log">Per-frame CSV log</string>
     <string name="summary_ull_frame_log">Also save the timings of every frame (up to 10 minutes per session)</string>
+    <string name="title_ull_capture_interval">Video captures for image comparison</string>
+    <string name="summary_ull_capture_interval">Saves the decoded frame as a PNG in the report folder (ull-sessions/&lt;version&gt;/) to compare it with screenshots of the PC. It does not include the box\'s own video processing. Leave it off when measuring latency.</string>
+    <string name="ull_capture_first_ok">Video capture saved: %1$s</string>
+    <string name="ull_capture_first_black">The video capture is black: this device does not let apps read the video (%1$s)</string>
+    <string name="ull_capture_first_failed">Video capture failed: %1$s</string>
     <string name="title_ull_restore_defaults">Restore default values</string>
     <string name="summary_ull_restore_defaults">Re-applies the Ultra Low Latency profile and resets the advanced latency settings</string>
     <string name="ull_restore_confirm">Restore the default latency settings? Gamepad, input and UI settings are not changed.</string>

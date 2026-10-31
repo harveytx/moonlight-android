@@ -473,3 +473,87 @@ texto de color siempre saldrá algo borroso. El decodificador recibe hoy rango l
 4. Opcional: 30 s de ruido (N, 768 px) a 80 Mbps, para ver el límite de la red (pérdidas,
    recepción).
 5. Envía `ull-sessions/12.2-ULL.6/` y las fotos.
+
+## 9.10 Sexta ronda (ULL.6, 31-10-2026 09:48–09:59) y capturas para comparar la nitidez (ULL.7)
+
+Datos en [data/zte-b866v2k/12.2-ULL.6/](data/zte-b866v2k/12.2-ULL.6/). 11 sesiones a 1080p60 y un
+benchmark H.264 (10:01).
+
+### Monitor: LG 27GP750-B, panel 1920×1080
+
+Según la etiqueta, el monitor es un **LG 27GP750-B** (09/2023). Las fichas de producto lo describen
+con panel IPS **1920×1080 a 240 Hz** y HDMI 2.0. Aunque su EDID anuncia modos 3840×2160, el panel es
+1080p, así que una salida 4K del ZTE solo se reduciría en el monitor: no aporta nitidez. La salida
+1080p del ZTE coincide con el panel y las 11 sesiones registran `display_mode` 1920x1080@60.00 y
+`client_scaling` none. Si el escritorio del PC también está a 1920×1080, nada escala en toda la
+cadena. Lo que falte de nitidez frente al PC vendrá entonces de la compresión (bitrate, croma 4:2:0)
+o del procesado de vídeo del ZTE o del monitor.
+
+### Tamaño de fotograma frente al techo (primera ronda con esta medida)
+
+| Hora (duración) | Códec | Configurado / real | Fotograma p50 / p95 / máx | Techo estimado | En el techo | Recepción p50 / p95 | 1.er paquete → liberado p50 / p95 |
+|---|---|---|---|---|---|---|---|
+| 09:54:51 (64 s) | H.264 | 20 / 11,3 Mbps | 24,8 / 30,3 / 31,6 kB | 31,9 kB | 36 % | 1,78 / 2,52 ms | 6,98 / 8,36 ms |
+| 09:58:11 (99 s) | H.264 | 20 / 10,6 | 30,3 / 31,7 / 33,0 | 31,9 | 69 % | 2,26 / 2,92 | 6,82 / 8,74 |
+| 09:50:31 (124 s) | H.264 | 50 / 24,8 | 77,1 / 79,8 / 85,3 | 81,9 | 59 % | 6,02 / 6,68 | 10,96 / 12,76 |
+| 09:48:19 (246 s) | H.264 | 50 / 3,9 | 4,1 / 53,7 / 85,3 | 81,9 | 2 % | 0,04 / 4,16 | 4,70 / 9,14 |
+| 09:53:33 (143 s) | H.264 | 80 / 17,9 | 39,9 / 123,0 / 144,5 | 131,9 | 6 % | 3,06 / 10,18 | 8,00 / 15,78 |
+| 09:55:24 (6 s) | HEVC | 50 / 34,8 | 77,1 / 78,4 / 79,8 | 81,9 | 85 % | 6,24 / 6,74 | (presentación equilibrada) |
+
+0 pérdidas en todas las sesiones. Lo que muestran:
+
+* **El modelo de coste de 9.9 se cumple.** A 80 Mbps, los fotogramas del p95 (123 kB) tardan
+  10,18 ms en llegar; el modelo predecía 0,086 × 123 − 0,3 ≈ 10,3 ms.
+* **El techo es aproximado.** Los máximos lo superan un 3–10 % (85,3 frente a 81,9 kB; 144,5 frente
+  a 131,9): el búfer de NVENC no es un límite exacto. "En el techo" cuenta los fotogramas ≥ 85 % del
+  techo, y con ese margen sigue siendo válido.
+* **Con imagen que cambia, 20 Mbps está casi siempre en el techo** (36–100 % según la sesión; en las
+  sesiones cortas, 100 %) **y 50 Mbps el 59 %**: en esas sesiones la imagen estaba limitada por el
+  bitrate. En la sesión de 80 Mbps, el p95 (123 kB) supera en un 50 % el techo de 50 Mbps, así que
+  esos fotogramas, a 50 Mbps, habrían salido con menos calidad. No se pueden comparar más a fondo:
+  el contenido no fue el mismo en todas (la sesión de 80 Mbps tuvo menos bitrate real que la de 50).
+* **Coste en latencia** (p95 de 1.er paquete → liberado): 8,4–8,7 ms a 20 Mbps, 12,8 ms a 50 y
+  15,8 ms a 80.
+* **HEVC con las claves "vendor"** (recomendadas por el benchmark de ULL.5) funciona en una sesión
+  real, con decodificación de 2,44 ms (sesión de 6 s).
+* **Benchmark H.264:** original otra vez (p95 2,55 ms; vendor 2,58).
+
+### Capturas para comparar con el PC (ULL.7)
+
+La nitidez frente al PC no se puede juzgar bien con fotos del monitor. ULL.7 añade:
+
+* **Opción "Capturas del vídeo para comparar la imagen"** (cada 10, 30 o 60 s). Guarda el fotograma
+  decodificado, tal como sale del decodificador y antes del procesado del ZTE y de la salida HDMI,
+  como PNG del tamaño del stream en `ull-sessions/<versión>/`. El códec y el bitrate van en el
+  nombre del archivo. Usa `PixelCopy`. Algunos equipos ponen el vídeo en un plano que las apps no
+  pueden leer: entonces la captura sale negra o falla. Por eso la primera llega a los 5 s y avisa
+  del resultado.
+* **Patrón reproducible.** Cada fotograma de `tools/image-test.html` depende solo de su número. Con
+  la tecla G y el número que aparece en la captura, el PC muestra exactamente ese contenido para
+  hacer la captura de referencia.
+* **`tools/compare-captures.html`.** Mide nitidez relativa, SSIM, PSNR de luma y croma y
+  desplazamiento de nivel en la zona estática, la de movimiento o la que se elija.
+
+Lo que falte en las capturas frente al PC es compresión: se corrige con bitrate, códec o ajustes de
+Sunshine. Si las capturas son nítidas pero el monitor no, la pérdida está en la salida de vídeo del
+ZTE (su procesado, una opción de zoom o posición de pantalla) o en el monitor (nitidez, modo de
+imagen). Si la captura sale negra en el ZTE, la alternativa es una capturadora HDMI en el PC
+conectada a la salida del ZTE. Esa medida incluiría también el procesado del ZTE.
+
+**Hipótesis (por medir):**
+
+* En la zona estática, la luma será casi idéntica a partir de 50 Mbps, porque Sunshine vuelve a
+  codificar la imagen fija y la afina.
+* El croma será siempre peor por el 4:2:0.
+* En la zona de movimiento, la nitidez subirá con el bitrate y será mejor con HEVC que con H.264 al
+  mismo bitrate.
+
+### Próximas pruebas (ULL.7)
+
+1. En la app: capturas cada 30 s y overlay detallado. En el PC: escritorio a 1920×1080 y
+   `tools/image-test.html` a pantalla completa con la ayuda oculta (H), en movimiento (M) y sin
+   ruido.
+2. Unos 2 minutos por configuración: H.264 a 20, 50 y 80 Mbps; HEVC a 50 y 80 Mbps.
+3. Para 2 o 3 capturas de cada configuración: tecla G con su número de fotograma y captura del PC.
+   Compara en `compare-captures.html` la zona estática y la de movimiento.
+4. Envía `ull-sessions/12.2-ULL.7/` (con los PNG) y las capturas del PC.

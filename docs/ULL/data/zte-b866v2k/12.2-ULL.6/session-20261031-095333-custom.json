@@ -1,0 +1,181 @@
+{
+  "format": "moonlight-ull-session-1",
+  "timestamp": "20261031-095333",
+  "app_version": "12.2-ULL.6",
+  "host": "(redacted)",
+  "app": "Desktop",
+  "device": {
+    "manufacturer": "ZTE",
+    "model": "zBox 1",
+    "device": "YXE",
+    "hardware": "amlogic",
+    "android": "14 (API 34)",
+    "soc": "Amlogic AMLS905Y4"
+  },
+  "settings": {
+    "profile": "custom",
+    "resolution": "1920x1080",
+    "fps": 60,
+    "bitrate_kbps": 80000,
+    "frame_pacing": 0,
+    "video_format_pref": "FORCE_H264",
+    "low_latency_mode_pref": 3,
+    "latency_guard_pref": 2,
+    "thread_priority_pref": 2
+  },
+  "decoder": {
+    "decoder": "c2.amlogic.avc.decoder",
+    "video_format": "0x1",
+    "resolution": "1920x1080",
+    "fps": "60",
+    "bitrate_kbps": "80000",
+    "frame_ceiling_kb_estimate": "131.9",
+    "color_range": "limited",
+    "display_mode": "1920x1080@60.00",
+    "client_scaling": "none",
+    "low_latency_mode": "vendor",
+    "low_latency_mode_reason": "user setting",
+    "low_latency_keys": "low-latency=1, vdec-lowlatency=1, priority=0, vendor.START.low-latency.enable=1",
+    "frame_pacing": "0",
+    "direct_submit": "true",
+    "rfi_active": "false",
+    "adaptive_playback": "true",
+    "fused_idr": "true",
+    "slices_per_frame": "1",
+    "latency_guard_mode": "2",
+    "latency_guard_resyncs": "0",
+    "decoder_saturated": "false",
+    "thread_priority_level": "2",
+    "native_thread_priority": "VideoRecv=-16",
+    "display_time_reported": "true",
+    "output_format": "{crop-right=1919, sar-width=1, color-format=2130708361, mime=video\/raw, hdr-static-info=java.nio.HeapByteBuffer[pos=0 lim=25 cap=25], color-standard=1, color-transfer=3, sar-height=1, crop-bottom=1079, output.hdr-dynamic-info.data=java.nio.HeapByteBuffer[pos=0 lim=0 cap=0], crop-left=0, width=1920, color-range=2, crop-top=0, rotation-degrees=0, frame-rate=60, output.hdr-dynamic-info.type=0, height=1080}"
+  },
+  "stages_ms": {
+    "receive": {
+      "count": 7975,
+      "mean_ms": 3.108,
+      "min_ms": 0.007,
+      "p50_ms": 3.06,
+      "p95_ms": 10.18,
+      "p99_ms": 11.48,
+      "max_ms": 12.638
+    },
+    "submit": {
+      "count": 7975,
+      "mean_ms": 1.234,
+      "min_ms": 0.801,
+      "p50_ms": 1.14,
+      "p95_ms": 1.84,
+      "p99_ms": 3.04,
+      "max_ms": 10.284
+    },
+    "input_wait": {
+      "count": 7975,
+      "mean_ms": 0.146,
+      "min_ms": 0.092,
+      "p50_ms": 0.12,
+      "p95_ms": 0.26,
+      "p99_ms": 0.74,
+      "max_ms": 2.919
+    },
+    "decode": {
+      "count": 7945,
+      "mean_ms": 2.613,
+      "min_ms": 0.261,
+      "p50_ms": 2.42,
+      "p95_ms": 3.78,
+      "p99_ms": 4.32,
+      "max_ms": 57.651
+    },
+    "pacing": {
+      "count": 7943,
+      "mean_ms": 1.266,
+      "min_ms": 0.574,
+      "p50_ms": 1.18,
+      "p95_ms": 1.78,
+      "p99_ms": 2.48,
+      "max_ms": 11.72
+    },
+    "display": {
+      "count": 7766,
+      "mean_ms": 20.59,
+      "min_ms": 10.914,
+      "p50_ms": 20.98,
+      "p95_ms": 26.98,
+      "p99_ms": 28.8,
+      "max_ms": 29.716
+    },
+    "client": {
+      "count": 7954,
+      "mean_ms": 8.211,
+      "min_ms": 3.907,
+      "p50_ms": 8,
+      "p95_ms": 15.78,
+      "p99_ms": 17.16,
+      "max_ms": 61.007
+    },
+    "client_display": {
+      "count": 7766,
+      "mean_ms": 28.745,
+      "min_ms": 17.348,
+      "p50_ms": 27.54,
+      "p95_ms": 37.36,
+      "p99_ms": 39.34,
+      "max_ms": 74.806
+    },
+    "queue_delay": {
+      "count": 7260,
+      "mean_ms": 2.672,
+      "min_ms": 0,
+      "p50_ms": 2.68,
+      "p95_ms": 3.68,
+      "p99_ms": 4.2,
+      "max_ms": 16.298
+    },
+    "host": {
+      "count": 7260,
+      "mean_ms": 5.217,
+      "min_ms": 4.6,
+      "p50_ms": 5.12,
+      "p95_ms": 6.02,
+      "p99_ms": 6.52,
+      "max_ms": 18.8
+    },
+    "jni": {
+      "count": 7975,
+      "mean_ms": 0.011,
+      "min_ms": 0.004,
+      "p50_ms": 0.02,
+      "p95_ms": 0.02,
+      "p99_ms": 0.02,
+      "max_ms": 1.234
+    }
+  },
+  "counters": {
+    "duration_s": 143.312,
+    "frames_received": 7975,
+    "frames_lost_network": 0,
+    "loss_events": 0,
+    "frames_decoded": 7956,
+    "frames_rendered": 7954,
+    "frames_dropped_render": 2,
+    "frames_displayed_reported": 7766,
+    "resyncs": 0,
+    "received_fps": 55.648,
+    "rendered_fps": 55.501,
+    "network_loss_percent": 0,
+    "render_drop_percent": 0.025,
+    "jitter_ms": 0.083,
+    "bitrate_mbps": 17.942
+  },
+  "frame_size_kb": {
+    "count": 7975,
+    "mean_kb": 40.304,
+    "p50_kb": 39.9,
+    "p95_kb": 123,
+    "p99_kb": 130,
+    "max_kb": 144.472,
+    "ceiling_kb_estimate": 131.891,
+    "at_ceiling_percent": 6.32
+  }
+}

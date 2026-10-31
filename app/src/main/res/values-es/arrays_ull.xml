@@ -27,4 +27,11 @@
         <item>Alta (recomendado)</item>
         <item>Máxima</item>
     </string-array>
+
+    <string-array name="ull_capture_interval_names">
+        <item>Desactivadas</item>
+        <item>Cada 10 s</item>
+        <item>Cada 30 s</item>
+        <item>Cada 60 s</item>
+    </string-array>
 </resources>

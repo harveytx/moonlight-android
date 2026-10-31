@@ -2041,6 +2041,19 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         return "(none)";
     }
 
+    /** ULL: codec and bitrate for the file names of video captures, e.g. "h264-50mbps". */
+    public String getCaptureLabel() {
+        String codec;
+        if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H265) != 0) {
+            codec = "hevc";
+        } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_AV1) != 0) {
+            codec = "av1";
+        } else {
+            codec = "h264";
+        }
+        return codec + "-" + (prefs.bitrate / 1000) + "mbps";
+    }
+
     /** ULL: key/value description of the decoder configuration, for session reports. */
     public java.util.LinkedHashMap<String, String> getDecoderDiagnostics() {
         java.util.LinkedHashMap<String, String> map = new java.util.LinkedHashMap<>();

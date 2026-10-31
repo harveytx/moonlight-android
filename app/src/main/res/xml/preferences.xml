@@ -69,6 +69,13 @@
                 android:title="@string/title_ull_frame_log"
                 android:summary="@string/summary_ull_frame_log"
                 android:defaultValue="false" />
+            <ListPreference
+                android:key="ull_capture_interval"
+                android:title="@string/title_ull_capture_interval"
+                android:summary="@string/summary_ull_capture_interval"
+                android:entries="@array/ull_capture_interval_names"
+                android:entryValues="@array/ull_capture_interval_values"
+                android:defaultValue="0" />
         </PreferenceScreen>
         <Preference
             android:key="ull_restore_defaults"

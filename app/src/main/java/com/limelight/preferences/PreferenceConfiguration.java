@@ -77,10 +77,12 @@ public class PreferenceConfiguration {
     static final String ULL_DETAILED_OVERLAY_PREF_STRING = "ull_detailed_overlay";
     static final String ULL_RECORD_SESSIONS_PREF_STRING = "ull_record_sessions";
     static final String ULL_FRAME_LOG_PREF_STRING = "ull_frame_log";
+    static final String ULL_CAPTURE_INTERVAL_PREF_STRING = "ull_capture_interval";
     public static final String DECODER_AUTO = "auto";
     private static final boolean DEFAULT_ULL_DETAILED_OVERLAY = true;
     private static final boolean DEFAULT_ULL_RECORD_SESSIONS = true;
     private static final boolean DEFAULT_ULL_FRAME_LOG = false;
+    private static final String DEFAULT_ULL_CAPTURE_INTERVAL = "0";
 
     static final String DEFAULT_RESOLUTION = "1280x720";
     static final String DEFAULT_FPS = "60";
@@ -178,8 +180,19 @@ public class PreferenceConfiguration {
     public boolean detailedPerfOverlay;
     public boolean recordSessions;
     public boolean recordFrameLog;
+    // Seconds between captures of the decoded video (0 = off)
+    public int captureIntervalSec;
     // Decoder benchmark only (never persisted): release decoded frames without rendering them
     public boolean benchmarkDiscardOutput;
+
+    static int parseCaptureInterval(String value) {
+        try {
+            int seconds = Integer.parseInt(value.trim());
+            return seconds > 0 ? Math.min(seconds, 3600) : 0;
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
 
     public static boolean isNativeResolution(int width, int height) {
         // It's not a native resolution if it matches an existing resolution option
@@ -679,6 +692,8 @@ public class PreferenceConfiguration {
         config.detailedPerfOverlay = prefs.getBoolean(ULL_DETAILED_OVERLAY_PREF_STRING, DEFAULT_ULL_DETAILED_OVERLAY);
         config.recordSessions = prefs.getBoolean(ULL_RECORD_SESSIONS_PREF_STRING, DEFAULT_ULL_RECORD_SESSIONS);
         config.recordFrameLog = prefs.getBoolean(ULL_FRAME_LOG_PREF_STRING, DEFAULT_ULL_FRAME_LOG);
+        config.captureIntervalSec = parseCaptureInterval(
+                prefs.getString(ULL_CAPTURE_INTERVAL_PREF_STRING, DEFAULT_ULL_CAPTURE_INTERVAL));
 
         return config;
     }

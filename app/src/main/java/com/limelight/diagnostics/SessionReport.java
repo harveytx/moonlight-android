@@ -64,7 +64,7 @@ public final class SessionReport {
     }
 
     /** Folder of the running app version, where new reports are written. */
-    public static File getDirectory(Context context) {
+    public static synchronized File getDirectory(Context context) {
         File root = getRootDirectory(context);
         migrateLegacyFiles(root);
         File dir = new File(root, versionFolderName(BuildConfig.VERSION_NAME));
@@ -154,7 +154,8 @@ public final class SessionReport {
      * @return the report file, or null if the session was too short or saving failed
      */
     public static File save(Context context, MediaCodecDecoderRenderer renderer,
-                            PreferenceConfiguration prefs, String hostName, String appName) {
+                            PreferenceConfiguration prefs, String hostName, String appName,
+                            List<String> captures) {
         PipelineStats stats = renderer.getPipelineStats();
         PipelineStats.Snapshot snap = stats.getSessionSnapshot(System.nanoTime());
         if (snap.counters.framesReceived < MIN_FRAMES_FOR_REPORT) {
@@ -191,6 +192,7 @@ public final class SessionReport {
             settings.put("low_latency_mode_pref", prefs.lowLatencyMode);
             settings.put("latency_guard_pref", prefs.latencyGuardMode);
             settings.put("thread_priority_pref", prefs.threadPriorityLevel);
+            settings.put("capture_interval_s", prefs.captureIntervalSec);
             root.put("settings", settings);
 
             JSONObject decoder = new JSONObject();
@@ -239,6 +241,11 @@ public final class SessionReport {
                 frameSize.put("at_ceiling_percent", round(snap.nearCeilingPercent()));
             }
             root.put("frame_size_kb", frameSize);
+
+            // ULL: video captures taken during the session (file and result)
+            if (captures != null && !captures.isEmpty()) {
+                root.put("captures", new org.json.JSONArray(captures));
+            }
 
             String baseName = "session-" + timestamp + "-" + prefs.latencyProfile;
             File out = new File(getDirectory(context), baseName + ".json");

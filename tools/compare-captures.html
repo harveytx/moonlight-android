@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<!--
+  Moonlight ULL - compare a video capture from the TV box with a screenshot of the PC.
+
+  Open this file in a browser on the PC (nothing is uploaded: the images stay local). Load the
+  PC screenshot as the original and the PNG saved by Moonlight ULL ("Video captures for image
+  comparison") as the stream. With tools/image-test.html, press G on the PC and type the frame
+  number shown in the capture before taking the screenshot: both then show the same content.
+
+  Metrics on the selected region (luma = BT.709 Y of the RGB images):
+  - Sharpness: gradient energy (Sobel) of the stream relative to the original. 100 % = as sharp;
+    below = blurrier; well above 100 % usually means noise or ringing, not more detail.
+  - SSIM (luma), PSNR (luma and chroma): similarity; chroma shows the 4:2:0 loss.
+  - Mean luma difference: a level shift (e.g. a black level or range mismatch).
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Moonlight ULL - comparar capturas</title>
+<style>
+  body { margin: 0; background: #181818; color: #ddd; font: 14px "Segoe UI", Arial, sans-serif; }
+  header { padding: 10px 16px; background: #222; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 16px; }
+  .drop { border: 2px dashed #555; padding: 10px 14px; border-radius: 6px; min-width: 300px; }
+  .drop.ok { border-color: #3a3; }
+  button, select { background: #333; color: #ddd; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; }
+  button.on { background: #2a5d8f; }
+  table { border-collapse: collapse; margin: 8px 16px; }
+  td, th { border: 1px solid #444; padding: 4px 10px; text-align: right; }
+  th { background: #262626; }
+  td:first-child, th:first-child { text-align: left; }
+  #views { display: flex; gap: 8px; padding: 8px 16px; }
+  .view { position: relative; }
+  .view canvas { image-rendering: pixelated; border: 1px solid #444; display: block; }
+  .view span { position: absolute; left: 6px; top: 4px; background: rgba(0,0,0,.7); padding: 1px 6px; }
+  #overview { cursor: crosshair; image-rendering: auto; }
+  #warn { color: #fc6; padding: 0 16px; }
+  #summary { width: calc(100% - 40px); margin: 0 16px 16px; height: 60px; background: #111; color: #ddd; }
+  .muted { color: #999; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Comparar captura del ZTE con captura del PC</h1>
+  <div class="muted">Las imágenes no salen de este equipo. Con el patrón (image-test.html): pulsa G en el PC y escribe el
+    número de fotograma que se ve en la captura del ZTE antes de hacer la captura del PC; oculta la ayuda (H) en ambas.</div>
+</header>
+<div class="row">
+  <label class="drop" id="dropA">Original (captura del PC): <input type="file" id="fileA" accept="image/*"></label>
+  <label class="drop" id="dropB">Stream (captura de Moonlight ULL): <input type="file" id="fileB" accept="image/*"></label>
+</div>
+<div id="warn"></div>
+<div class="row">
+  Región:
+  <button data-region="full" class="on">Imagen sin cabecera</button>
+  <button data-region="static">Zona estática del patrón</button>
+  <button data-region="motion">Zona de movimiento del patrón</button>
+  <span class="muted">o arrastra sobre la vista general para elegir una zona</span>
+</div>
+<table id="metrics"><tr><th>Medida (región)</th><th>Valor</th><th>Cómo leerlo</th></tr></table>
+<textarea id="summary" readonly></textarea>
+<div class="row">
+  Vista:
+  <select id="mode">
+    <option value="side">Lado a lado</option>
+    <option value="flicker">Parpadeo original / stream</option>
+    <option value="diff">Diferencia de luma ×4</option>
+  </select>
+  Zoom:
+  <select id="zoom"><option>1</option><option selected>2</option><option>4</option><option>8</option></select>
+  <span class="muted">Haz clic en la vista general para elegir qué zona ampliar.</span>
+</div>
+<div id="views">
+  <div class="view"><canvas id="viewA" width="640" height="400"></canvas><span id="labelA">Original</span></div>
+  <div class="view"><canvas id="viewB" width="640" height="400"></canvas><span id="labelB">Stream</span></div>
+</div>
+<div class="row"><canvas id="overview" width="960" height="540"></canvas></div>
+<script>
+"use strict";
+let A = null, B = null;            // {w, h, rgba, y, cb, cr, canvas}
+let region = null, regionName = "full";
+let center = { x: 0, y: 0 }, flickerOn = false, flickerTimer = null;
+const $ = (id) => document.getElementById(id);
+
+function loadFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function toPlanes(canvas) {
+  const w = canvas.width, h = canvas.height;
+  const rgba = canvas.getContext("2d").getImageData(0, 0, w, h).data;
+  const y = new Float32Array(w * h), cb = new Float32Array(w * h), cr = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+    const r = rgba[p], g = rgba[p + 1], b = rgba[p + 2];
+    const yy = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    y[i] = yy; cb[i] = (b - yy) / 1.8556; cr[i] = (r - yy) / 1.5748;
+  }
+  return { w, h, rgba, y, cb, cr, canvas };
+}
+
+function imageToCanvas(img, w, h) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+  x.drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+async function reload() {
+  const fa = $("fileA").files[0], fb = $("fileB").files[0];
+  $("dropA").classList.toggle("ok", !!fa); $("dropB").classList.toggle("ok", !!fb);
+  if (!fa || !fb) return;
+  const [ia, ib] = await Promise.all([loadFile(fa), loadFile(fb)]);
+  const w = ib.naturalWidth, h = ib.naturalHeight;
+  $("warn").textContent = (ia.naturalWidth !== w || ia.naturalHeight !== h)
+    ? `Tamaños distintos: el original (${ia.naturalWidth}x${ia.naturalHeight}) se reescala a ${w}x${h} para comparar; ` +
+      "el resultado incluye ese escalado (el escritorio del PC no tiene la resolución del stream)."
+    : "";
+  A = toPlanes(imageToCanvas(ia, w, h));
+  B = toPlanes(imageToCanvas(ib, w, h));
+  center = { x: w / 2, y: h / 2 };
+  setRegion(regionName);
+}
+
+// Regions of tools/image-test.html (same layout formulas)
+function presetRegion(name, w, h) {
+  const s = Math.max(0.6, Math.min(w / 1920, h / 1080));
+  const header = Math.round(60 * s);
+  if (name === "static") return { x: 0, y: header, w: w, h: Math.round(h * 0.52) - header - 4 };
+  if (name === "motion") { const x = Math.round(w * 0.52), y = Math.round(h * 0.52); return { x, y, w: w - x, h: h - y }; }
+  return { x: 0, y: header, w: w, h: h - header };
+}
+
+function setRegion(name, custom) {
+  regionName = name;
+  document.querySelectorAll("button[data-region]").forEach(b => b.classList.toggle("on", b.dataset.region === name));
+  if (!A) return;
+  region = custom || presetRegion(name, A.w, A.h);
+  computeMetrics();
+  drawOverview();
+  drawViews();
+}
+
+function psnr(mse) { return mse <= 1e-10 ? Infinity : 10 * Math.log10(255 * 255 / mse); }
+
+function computeMetrics() {
+  const { x: rx, y: ry, w: rw, h: rh } = region, W = A.w;
+  let seY = 0, seC = 0, sumYA = 0, sumYB = 0, n = 0;
+  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) {
+    const i = y * W + x, dy = A.y[i] - B.y[i], dcb = A.cb[i] - B.cb[i], dcr = A.cr[i] - B.cr[i];
+    seY += dy * dy; seC += (dcb * dcb + dcr * dcr) / 2; sumYA += A.y[i]; sumYB += B.y[i]; n++;
+  }
+  // Gradient energy (Sobel magnitude) inside the region
+  const grad = (P) => {
+    let s = 0;
+    for (let y = Math.max(ry, 1); y < Math.min(ry + rh, A.h - 1); y++) for (let x = Math.max(rx, 1); x < Math.min(rx + rw, W - 1); x++) {
+      const i = y * W + x;
+      const gx = -P[i - W - 1] - 2 * P[i - 1] - P[i + W - 1] + P[i - W + 1] + 2 * P[i + 1] + P[i + W + 1];
+      const gy = -P[i - W - 1] - 2 * P[i - W] - P[i - W + 1] + P[i + W - 1] + 2 * P[i + W] + P[i + W + 1];
+      s += Math.sqrt(gx * gx + gy * gy);
+    }
+    return s;
+  };
+  const gA = grad(A.y), gB = grad(B.y);
+  // SSIM on luma, 8x8 windows with a stride of 4
+  const C1 = (0.01 * 255) ** 2, C2 = (0.03 * 255) ** 2;
+  let ssimSum = 0, windows = 0;
+  for (let y = ry; y + 8 <= ry + rh; y += 4) for (let x = rx; x + 8 <= rx + rw; x += 4) {
+    let ma = 0, mb = 0;
+    for (let j = 0; j < 8; j++) for (let k = 0; k < 8; k++) { const i = (y + j) * W + x + k; ma += A.y[i]; mb += B.y[i]; }
+    ma /= 64; mb /= 64;
+    let va = 0, vb = 0, cov = 0;
+    for (let j = 0; j < 8; j++) for (let k = 0; k < 8; k++) {
+      const i = (y + j) * W + x + k, da = A.y[i] - ma, db = B.y[i] - mb;
+      va += da * da; vb += db * db; cov += da * db;
+    }
+    va /= 63; vb /= 63; cov /= 63;
+    ssimSum += ((2 * ma * mb + C1) * (2 * cov + C2)) / ((ma * ma + mb * mb + C1) * (va + vb + C2));
+    windows++;
+  }
+  const m = {
+    sharp: gA > 0 ? 100 * gB / gA : NaN,
+    ssim: windows ? ssimSum / windows : NaN,
+    psnrY: psnr(seY / n), psnrC: psnr(seC / n),
+    dMean: (sumYB - sumYA) / n,
+  };
+  const fmt = (v, d) => Number.isFinite(v) ? v.toFixed(d) : (v === Infinity ? "∞ (idénticas)" : "n/a");
+  const fmtDb = (v) => Number.isFinite(v) ? v.toFixed(2) + " dB" : fmt(v, 2);
+  const rows = [
+    ["Nitidez del stream frente al original", fmt(m.sharp, 1) + " %", "100 % = igual de nítido; menos = más borroso; muy por encima = ruido o halos"],
+    ["SSIM luma", fmt(m.ssim, 4), "1 = idéntico; por debajo de ~0,95 se suelen ver diferencias de cerca"],
+    ["PSNR luma", fmtDb(m.psnrY), "Más es mejor; ≥ 40 dB suele ser difícil de distinguir"],
+    ["PSNR croma", fmtDb(m.psnrC), "Más bajo que la luma por el croma 4:2:0 (normal en este ZTE)"],
+    ["Diferencia media de luma", fmt(m.dMean, 2), "Cerca de 0; si no, cambio de nivel (rango limitado/completo, negros)"],
+  ];
+  $("metrics").innerHTML = "<tr><th>Medida (región)</th><th>Valor</th><th>Cómo leerlo</th></tr>" +
+    rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="muted" style="text-align:left">${r[2]}</td></tr>`).join("");
+  const fa = $("fileA").files[0].name, fb = $("fileB").files[0].name;
+  $("summary").value = `${fb} frente a ${fa} | región ${regionName} ${region.w}x${region.h}+${region.x}+${region.y} | ` +
+    `nitidez ${fmt(m.sharp, 1)} % | SSIM ${fmt(m.ssim, 4)} | PSNR Y ${fmtDb(m.psnrY)} | PSNR croma ${fmtDb(m.psnrC)} | ` +
+    `dif. media luma ${fmt(m.dMean, 2)}` + ($("warn").textContent ? " | original reescalado" : "");
+}
+
+function drawOverview() {
+  const c = $("overview"), x = c.getContext("2d");
+  x.drawImage(B.canvas, 0, 0, c.width, c.height);
+  const sx = c.width / A.w, sy = c.height / A.h;
+  x.strokeStyle = "#3af"; x.lineWidth = 2;
+  x.strokeRect(region.x * sx, region.y * sy, region.w * sx, region.h * sy);
+  const z = Number($("zoom").value), vw = $("viewA").width / z, vh = $("viewA").height / z;
+  x.strokeStyle = "#fc3";
+  x.strokeRect((center.x - vw / 2) * sx, (center.y - vh / 2) * sy, vw * sx, vh * sy);
+}
+
+function diffCanvas() {
+  if (A.diff) return A.diff;
+  const c = document.createElement("canvas"); c.width = A.w; c.height = A.h;
+  const x = c.getContext("2d"), img = x.createImageData(A.w, A.h);
+  for (let i = 0, p = 0; i < A.w * A.h; i++, p += 4) {
+    const v = Math.min(255, Math.abs(A.y[i] - B.y[i]) * 4);
+    img.data[p] = v; img.data[p + 1] = v; img.data[p + 2] = v; img.data[p + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  return (A.diff = c);
+}
+
+function drawZoomed(canvas, source) {
+  const z = Number($("zoom").value), x = canvas.getContext("2d");
+  const vw = canvas.width / z, vh = canvas.height / z;
+  const sx = Math.max(0, Math.min(A.w - vw, Math.round(center.x - vw / 2)));
+  const sy = Math.max(0, Math.min(A.h - vh, Math.round(center.y - vh / 2)));
+  x.imageSmoothingEnabled = false;
+  x.fillStyle = "#000"; x.fillRect(0, 0, canvas.width, canvas.height);
+  x.drawImage(source, sx, sy, vw, vh, 0, 0, canvas.width, canvas.height);
+}
+
+function drawViews() {
+  if (!A) return;
+  const mode = $("mode").value;
+  clearInterval(flickerTimer);
+  $("viewB").parentElement.style.display = mode === "side" ? "" : "none";
+  if (mode === "side") {
+    $("labelA").textContent = "Original"; $("labelB").textContent = "Stream";
+    drawZoomed($("viewA"), A.canvas); drawZoomed($("viewB"), B.canvas);
+  } else if (mode === "diff") {
+    $("labelA").textContent = "Diferencia de luma ×4 (negro = igual)";
+    drawZoomed($("viewA"), diffCanvas());
+  } else {
+    const show = () => {
+      flickerOn = !flickerOn;
+      $("labelA").textContent = flickerOn ? "Stream" : "Original";
+      drawZoomed($("viewA"), flickerOn ? B.canvas : A.canvas);
+    };
+    show();
+    flickerTimer = setInterval(show, 600);
+  }
+  drawOverview();
+}
+
+// Overview: click to choose the zoomed area, drag to select a region for the metrics
+let dragStart = null;
+$("overview").addEventListener("mousedown", (e) => { dragStart = { x: e.offsetX, y: e.offsetY }; });
+$("overview").addEventListener("mouseup", (e) => {
+  if (!A || !dragStart) return;
+  const c = $("overview"), sx = A.w / c.width, sy = A.h / c.height;
+  const x0 = Math.min(dragStart.x, e.offsetX) * sx, y0 = Math.min(dragStart.y, e.offsetY) * sy;
+  const x1 = Math.max(dragStart.x, e.offsetX) * sx, y1 = Math.max(dragStart.y, e.offsetY) * sy;
+  dragStart = null;
+  if (x1 - x0 > 16 && y1 - y0 > 16) {
+    setRegion("manual", { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) });
+  } else {
+    center = { x: e.offsetX * sx, y: e.offsetY * sy };
+    drawViews();
+  }
+});
+
+document.querySelectorAll("button[data-region]").forEach(b => b.addEventListener("click", () => setRegion(b.dataset.region)));
+$("fileA").addEventListener("change", reload);
+$("fileB").addEventListener("change", reload);
+$("mode").addEventListener("change", drawViews);
+$("zoom").addEventListener("change", drawViews);
+</script>
+</body>
+</html>

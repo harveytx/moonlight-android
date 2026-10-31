@@ -51,4 +51,17 @@
         <item>high</item>
         <item>max</item>
     </string-array>
+
+    <string-array name="ull_capture_interval_names">
+        <item>Off</item>
+        <item>Every 10 s</item>
+        <item>Every 30 s</item>
+        <item>Every 60 s</item>
+    </string-array>
+    <string-array name="ull_capture_interval_values" translatable="false">
+        <item>0</item>
+        <item>10</item>
+        <item>30</item>
+        <item>60</item>
+    </string-array>
 </resources>

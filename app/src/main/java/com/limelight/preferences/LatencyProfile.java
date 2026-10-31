@@ -167,6 +167,7 @@ public final class LatencyProfile {
                 .remove(PreferenceConfiguration.ULL_DETAILED_OVERLAY_PREF_STRING)
                 .remove(PreferenceConfiguration.ULL_RECORD_SESSIONS_PREF_STRING)
                 .remove(PreferenceConfiguration.ULL_FRAME_LOG_PREF_STRING)
+                .remove(PreferenceConfiguration.ULL_CAPTURE_INTERVAL_PREF_STRING)
                 .commit();
         apply(context, DEFAULT_PROFILE);
     }
