@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+  Moonlight ULL - glass-to-glass latency clock.
+
+  Open this page full screen on the PC that runs Sunshine and stream the desktop to the TV.
+  Film the PC monitor and the TV together with a phone in slow motion (240 fps if possible).
+  For each video frame where both clocks are readable: latency = PC time - TV time.
+  The frame counter and the moving bar help to spot the exact frame.
+
+  This measures capture + encode + network + decode + display (including the TV's own
+  processing), but not input latency. Compare apps/profiles under identical conditions.
+
+  Input-to-display: pressing any key or any gamepad button (the controller connected to the
+  TV box, forwarded by Moonlight to Sunshine's virtual gamepad) turns the whole page white
+  while held. Film the controller and the TV together and count the camera frames between
+  the button press and the white screen on the TV.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Moonlight ULL latency clock</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; overflow: hidden;
+               font-family: "DejaVu Sans Mono", Consolas, monospace; }
+  #ms { font-size: 18vw; line-height: 1; text-align: center; margin-top: 8vh; letter-spacing: -0.04em; }
+  #info { font-size: 2.5vw; text-align: center; color: #aaa; }
+  #bar { position: absolute; bottom: 10vh; width: 4vw; height: 20vh; background: #0f0; }
+  #flash { position: absolute; top: 2vh; right: 2vw; width: 10vw; height: 10vw; }
+  body.pressed { background: #fff; color: #000; }
+</style>
+</head>
+<body>
+<div id="ms">0</div>
+<div id="info">frame 0 · refresh ? Hz</div>
+<div id="bar"></div>
+<div id="flash"></div>
+<script>
+  const ms = document.getElementById('ms');
+  const info = document.getElementById('info');
+  const bar = document.getElementById('bar');
+  const flash = document.getElementById('flash');
+  let frame = 0, last = performance.now(), avgInterval = 16.7;
+  let keyDown = false;
+  window.addEventListener('keydown', () => { keyDown = true; });
+  window.addEventListener('keyup', () => { keyDown = false; });
+  window.addEventListener('mousedown', () => { keyDown = true; });
+  window.addEventListener('mouseup', () => { keyDown = false; });
+  function gamepadPressed() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const pad of pads) {
+      if (pad && pad.buttons.some(b => b.pressed)) return true;
+    }
+    return false;
+  }
+  function tick(now) {
+    frame++;
+    document.body.classList.toggle('pressed', keyDown || gamepadPressed());
+    avgInterval += ((now - last) - avgInterval) * 0.05;
+    last = now;
+    // Milliseconds since page load, 3 digits of sub-second resolution
+    const t = Math.floor(now) % 100000;
+    ms.textContent = String(t).padStart(5, '0');
+    info.textContent = 'frame ' + frame + ' · refresh ' + (1000 / avgInterval).toFixed(1) + ' Hz';
+    bar.style.left = ((frame % 120) / 120 * 96) + 'vw';
+    flash.style.background = (frame % 2) ? '#fff' : '#000';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+# Builds Moonlight ULL APKs and runs the unit tests.
+#
+# Optional release signing: add these repository secrets
+#   ULL_KEYSTORE_BASE64   base64 of the .jks keystore (base64 -w0 release.jks)
+#   ULL_KEYSTORE_PASSWORD keystore password
+#   ULL_KEY_ALIAS         key alias
+#   ULL_KEY_PASSWORD      key password
+# Without them the APK is signed with the runner's throwaway debug key (installable, but
+# every build has a different signature, so updates require uninstalling first).
+name: Build Moonlight ULL
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;29.0.14206865" "platforms;android-37"
+
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ULL_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ULL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ULL_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ULL_KEY_PASSWORD }}
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testNonRootDebugUnitTest
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleNonRootRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moonlight-ull-apk
+          path: app/build/outputs/apk/nonRoot/release/*.apk
