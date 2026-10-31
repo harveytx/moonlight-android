@@ -234,6 +234,7 @@ public final class SessionReport {
             {R.string.ull_metric_queue_delay_p95, "stages_ms/queue_delay/p95_ms", true},
             {R.string.ull_metric_receive, "stages_ms/receive/mean_ms", true},
             {R.string.ull_metric_submit, "stages_ms/submit/mean_ms", true},
+            {R.string.ull_metric_jni, "stages_ms/jni/mean_ms", true},
             {R.string.ull_metric_decode, "stages_ms/decode/mean_ms", true},
             {R.string.ull_metric_decode_p95, "stages_ms/decode/p95_ms", true},
             {R.string.ull_metric_pacing, "stages_ms/pacing/mean_ms", true},

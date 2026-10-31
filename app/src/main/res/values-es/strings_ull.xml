@@ -32,15 +32,16 @@
     <!-- Superposición de rendimiento (media / p95 del último segundo) -->
     <string name="ull_overlay_header">ULL (media / p95) · modo LL del decodificador: %1$s (%2$s)</string>
     <string name="ull_overlay_network">Red: recepción del fotograma %1$s · jitter %2$.2f ms · retardo de cola %3$s · %4$.1f Mbps</string>
-    <string name="ull_overlay_submit">Hasta el decodificador: %1$s (espera de buffer de entrada %2$s)</string>
+    <string name="ull_overlay_submit">Hasta el decodificador: %1$s (nativo→Java %2$s, espera de buffer de entrada %3$s)</string>
     <string name="ull_overlay_decode">Decodificación: %1$s · fotogramas dentro del decodificador: %2$d</string>
     <string name="ull_overlay_present">Espera hasta liberar: %1$s · presentación (sistema) %2$s · reemplazados %3$.1f%%</string>
     <string name="ull_overlay_client">Cliente 1er paquete → liberación: %1$s · → pantalla: %2$s</string>
     <string name="ull_overlay_cpu">CPU (de un núcleo): proceso %1$s · VideoRecv %2$s</string>
     <string name="ull_overlay_guard">Resincronizaciones de la protección de latencia: %1$d</string>
     <string name="ull_overlay_decoder_saturated">AVISO: el decodificador no sostiene esta transmisión. Baja FPS, resolución o bitrate.</string>
-    <string name="ull_overlay_no_allm">TV sin ALLM: activa a mano el Modo Juego del TV</string>
-    <string name="ull_warning_no_allm">Este TV no admite ALLM (modo juego automático). Activa a mano el Modo Juego del TV: su procesado de imagen puede añadir decenas de milisegundos.</string>
+    <string name="ull_overlay_no_allm">Pantalla sin ALLM (TV: activa el Modo Juego; monitor de PC: nada que hacer)</string>
+    <string name="ull_warning_no_allm">La pantalla (%1$s) no anuncia ALLM (modo juego automático). Si es un TV, activa a mano su Modo Juego: el procesado de imagen del TV puede añadir decenas de milisegundos. Los monitores de PC normalmente no procesan la imagen y no necesitan nada.</string>
+    <string name="ull_display_unknown">nombre no disponible</string>
     <string name="ull_warning_bitrate_link">%1$d Mbps (+FEC) está cerca del enlace Ethernet de %2$d Mbps: cada fotograma tarda ~%3$.1f ms en el cable y puede haber pérdidas. Se recomiendan 15–20 Mbps para 1080p60.</string>
     <string name="ull_overlay_network_congested">AVISO: cola de red sostenida. Baja el bitrate o revisa la red.</string>
 
@@ -79,6 +80,7 @@
     <string name="ull_metric_queue_delay_p95">Retardo de cola p95 (ms, est.)</string>
     <string name="ull_metric_receive">Tiempo de recepción (ms)</string>
     <string name="ull_metric_submit">Reensamblado → decodificador (ms)</string>
+    <string name="ull_metric_jni">…de ello, nativo → Java (ms)</string>
     <string name="ull_metric_decode">Decodificación media (ms)</string>
     <string name="ull_metric_decode_p95">Decodificación p95 (ms)</string>
     <string name="ull_metric_pacing">Decodificado → liberado (ms)</string>

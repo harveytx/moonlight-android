@@ -1859,7 +1859,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         long inputWaitNs = pendingInputWaitNs;
         pendingInputWaitNs = 0;
         long queueDelayNs = pipelineStats.onFrameQueued(timestampUs, frameNumber, receiveNs, enqueueNs,
-                inputWaitNs, queuedNs, presentationTimeUs, frameHostProcessingLatency, decodeUnitLength);
+                entryNs, inputWaitNs, queuedNs, presentationTimeUs, frameHostProcessingLatency, decodeUnitLength);
 
         // ULL: resync if a decoder backlog is building up (see LatencyGuard)
         if (latencyGuard != null && frameType != MoonBridge.FRAME_TYPE_IDR) {
@@ -1938,6 +1938,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                 w.bitrateMbps()));
         sb.append('\n').append(context.getString(R.string.ull_overlay_submit,
                 fmtStage(w.stages[PipelineStats.STAGE_SUBMIT]),
+                fmtStage(w.stages[PipelineStats.STAGE_JNI]),
                 fmtStage(w.stages[PipelineStats.STAGE_INPUT_WAIT])));
         sb.append('\n').append(context.getString(R.string.ull_overlay_decode,
                 fmtStage(w.stages[PipelineStats.STAGE_DECODE]),

@@ -36,11 +36,12 @@ public class PipelineStats {
     public static final int STAGE_CLIENT_DISPLAY = 7; // first packet -> displayed (system-reported)
     public static final int STAGE_QUEUE_DELAY = 8;    // network/socket queueing vs. window minimum (estimate)
     public static final int STAGE_HOST = 9;           // host processing latency (reported by host)
-    public static final int STAGE_COUNT = 10;
+    public static final int STAGE_JNI = 10;           // reassembled -> Java submitDecodeUnit() entry (part of SUBMIT)
+    public static final int STAGE_COUNT = 11;
 
     public static final String[] STAGE_KEYS = {
             "receive", "submit", "input_wait", "decode", "pacing",
-            "display", "client", "client_display", "queue_delay", "host"
+            "display", "client", "client_display", "queue_delay", "host", "jni"
     };
 
     private static final int RING_SIZE = 128;
@@ -132,8 +133,8 @@ public class PipelineStats {
     /** Optional per-frame log, kept in memory and written out when the session ends. */
     public static class FrameLog {
         public static final String HEADER = "frame,receive_ms,submit_ms,input_wait_ms,decode_ms,pacing_ms," +
-                "rendered,client_ms,queue_delay_ms,host_ms,bytes";
-        public static final int COLUMNS = 11;
+                "rendered,client_ms,queue_delay_ms,host_ms,bytes,jni_ms";
+        public static final int COLUMNS = 12;
 
         private final float[] data;
         private final int capacity;
@@ -212,6 +213,7 @@ public class PipelineStats {
     private final long[] recPtsUs = new long[RING_SIZE];
     private final long[] recReceiveNs = new long[RING_SIZE];
     private final long[] recEnqueueNs = new long[RING_SIZE];
+    private final long[] recEntryNs = new long[RING_SIZE];
     private final long[] recQueuedNs = new long[RING_SIZE];
     private final long[] recOutputNs = new long[RING_SIZE];
     private final long[] recReleaseNs = new long[RING_SIZE];
@@ -278,7 +280,7 @@ public class PipelineStats {
      * @return estimated network/socket queueing delay in ns, or -1 if not available
      */
     public synchronized long onFrameQueued(long ptsUs, int frameNumber, long receiveNs, long enqueueNs,
-                                           long inputWaitNs, long queuedNs, long hostPtsUs,
+                                           long entryNs, long inputWaitNs, long queuedNs, long hostPtsUs,
                                            int hostLatencyTenthsMs, int frameBytes) {
         startClocksIfNeeded(queuedNs);
 
@@ -291,6 +293,7 @@ public class PipelineStats {
 
         windowStages[STAGE_RECEIVE].add(enqueueNs - receiveNs);
         windowStages[STAGE_SUBMIT].add(queuedNs - enqueueNs);
+        windowStages[STAGE_JNI].add(entryNs - enqueueNs);
         windowStages[STAGE_INPUT_WAIT].add(inputWaitNs);
         if (queueDelayNs >= 0) {
             windowStages[STAGE_QUEUE_DELAY].add(queueDelayNs);
@@ -306,6 +309,7 @@ public class PipelineStats {
         recFrameNumber[idx] = frameNumber;
         recReceiveNs[idx] = receiveNs;
         recEnqueueNs[idx] = enqueueNs;
+        recEntryNs[idx] = entryNs;
         recQueuedNs[idx] = queuedNs;
         recInputWaitNs[idx] = inputWaitNs;
         recQueueDelayNs[idx] = queueDelayNs;
@@ -365,7 +369,8 @@ public class PipelineStats {
                     ms(releaseNs - recReceiveNs[idx]),
                     recQueueDelayNs[idx] >= 0 ? ms(recQueueDelayNs[idx]) : -1,
                     recHostTenthsMs[idx] / 10.0f,
-                    recBytes[idx]);
+                    recBytes[idx],
+                    ms(recEntryNs[idx] - recEnqueueNs[idx]));
         }
     }
 

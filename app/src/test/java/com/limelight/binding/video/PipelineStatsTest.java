@@ -15,7 +15,7 @@ public class PipelineStatsTest {
         s.enableFrameLog(10);
         long t = 10_000 * MS;
         // first packet t, reassembled +2 ms, queued +2.5 ms, decoded +10.5 ms, released +10.6, displayed +25
-        s.onFrameQueued(1000, 1, t, t + 2 * MS, 100_000, t + 2500_000, 16_667, 40, 30000);
+        s.onFrameQueued(1000, 1, t, t + 2 * MS, t + 2_200_000, 100_000, t + 2500_000, 16_667, 40, 30000);
         assertEquals(1, s.getDecoderInFlight());
         s.onFrameOutput(1000, t + 10_500_000);
         assertEquals(0, s.getDecoderInFlight());
@@ -25,6 +25,7 @@ public class PipelineStatsTest {
         PipelineStats.Snapshot snap = s.getSessionSnapshot(t + 1000 * MS);
         assertEquals(2.0, snap.stages[PipelineStats.STAGE_RECEIVE].meanMs, 0.03);
         assertEquals(0.5, snap.stages[PipelineStats.STAGE_SUBMIT].meanMs, 0.03);
+        assertEquals(0.2, snap.stages[PipelineStats.STAGE_JNI].meanMs, 0.03);
         assertEquals(0.1, snap.stages[PipelineStats.STAGE_INPUT_WAIT].meanMs, 0.03);
         assertEquals(8.0, snap.stages[PipelineStats.STAGE_DECODE].meanMs, 0.03);
         assertEquals(0.1, snap.stages[PipelineStats.STAGE_PACING].meanMs, 0.03);
@@ -46,8 +47,8 @@ public class PipelineStatsTest {
     public void droppedFramesAndLossAreCounted() {
         PipelineStats s = new PipelineStats();
         long t = 10_000 * MS;
-        s.onFrameQueued(1000, 1, t, t, 0, t, 0, 0, 100);
-        s.onFrameQueued(2000, 2, t, t, 0, t, 0, 0, 100);
+        s.onFrameQueued(1000, 1, t, t, t, 0, t, 0, 0, 100);
+        s.onFrameQueued(2000, 2, t, t, t, 0, t, 0, 0, 100);
         s.onFrameOutput(1000, t + MS);
         s.onFrameOutput(2000, t + MS);
         s.onFrameReleased(1000, t + MS, false);
@@ -74,8 +75,8 @@ public class PipelineStatsTest {
     @Test
     public void decoderResetClearsInFlight() {
         PipelineStats s = new PipelineStats();
-        s.onFrameQueued(1000, 1, 1, 1, 0, 1, 0, 0, 100);
-        s.onFrameQueued(2000, 2, 1, 1, 0, 1, 0, 0, 100);
+        s.onFrameQueued(1000, 1, 1, 1, 1, 0, 1, 0, 0, 100);
+        s.onFrameQueued(2000, 2, 1, 1, 1, 0, 1, 0, 0, 100);
         assertEquals(2, s.getDecoderInFlight());
         s.onDecoderReset();
         assertEquals(0, s.getDecoderInFlight());
@@ -89,7 +90,7 @@ public class PipelineStatsTest {
         for (int window = 1; window <= 5; window++) {
             // window N has N frames with N ms decode time
             for (int f = 0; f < window; f++) {
-                s.onFrameQueued(pts, (int) pts, t, t, 0, t, 0, 0, 100);
+                s.onFrameQueued(pts, (int) pts, t, t, t, 0, t, 0, 0, 100);
                 s.onFrameOutput(pts, t + window * MS);
                 pts++;
             }
@@ -108,11 +109,11 @@ public class PipelineStatsTest {
     public void resetDiscardsEverythingBefore() {
         PipelineStats s = new PipelineStats();
         long t = 10_000 * MS;
-        s.onFrameQueued(1000, 1, t, t, 0, t, 0, 0, 100);
+        s.onFrameQueued(1000, 1, t, t, t, 0, t, 0, 0, 100);
         s.onFrameOutput(1000, t + 50 * MS);
         s.rollWindow(t + 1000 * MS);
         s.resetStatistics(t + 1000 * MS);
-        s.onFrameQueued(2000, 2, t, t, 0, t, 0, 0, 100);
+        s.onFrameQueued(2000, 2, t, t, t, 0, t, 0, 0, 100);
         s.onFrameOutput(2000, t + 2 * MS);
         PipelineStats.Snapshot session = s.getSessionSnapshot(t + 2000 * MS);
         assertEquals(1, session.counters.framesDecoded);

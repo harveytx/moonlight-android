@@ -57,6 +57,8 @@ public class DecoderBenchmark {
         public int idrRequests;
         public boolean valid = true;
         public String error;
+        // p95 decode time of each round, in execution order of the rounds
+        public final List<Double> roundP95Ms = new ArrayList<>();
     }
 
     public static class Result {
@@ -77,7 +79,9 @@ public class DecoderBenchmark {
     private static final int WARMUP_FRAMES = 60;
     private static final int MEASURE_FRAMES = 300;
     private static final int THROUGHPUT_FRAMES = 600;
-    private static final int ROUNDS = 2;
+    // Three interleaved rounds: the first ZTE measurements showed ~0.6 ms of variation between
+    // runs of the same configuration, more than the 0.5 ms recommendation threshold
+    private static final int ROUNDS = 3;
     private static final int[] MODES = {
             MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL,
             MediaCodecHelper.LOW_LATENCY_MODE_STANDARD,
@@ -274,6 +278,7 @@ public class DecoderBenchmark {
             cr.decodeP50Ms = decode.p50Ms;
             cr.decodeP95Ms = decode.p95Ms;
             cr.decodeMaxMs = decode.maxMs;
+            cr.roundP95Ms.add(decode.p95Ms);
             cr.submitMeanMs = s.stages[PipelineStats.STAGE_SUBMIT].meanMs;
             cr.decodedPercent = s.counters.framesQueued > 0 ?
                     100.0 * s.counters.framesDecoded / s.counters.framesQueued : 0;
@@ -357,6 +362,7 @@ public class DecoderBenchmark {
             into.displayMeanMs = into.displayMeanMs >= 0 ? (into.displayMeanMs + r.displayMeanMs) / 2 : r.displayMeanMs;
         }
         into.idrRequests += r.idrRequests;
+        into.roundP95Ms.addAll(r.roundP95Ms);
         into.valid &= r.valid;
         if (into.error == null) {
             into.error = r.error;
@@ -402,9 +408,20 @@ public class DecoderBenchmark {
         try {
             ConfigResult[] merged = new ConfigResult[MODES.length];
             int step = 0;
-            int totalSteps = MODES.length * ROUNDS + 1;
+            int totalSteps = MODES.length * ROUNDS + 2;
+
+            // Discarded warm-up run. In the first ZTE run the configuration measured first
+            // (always "original") was ~0.9 ms slower than in later runs: JIT, CPU and decoder
+            // clocks were still cold.
+            step++;
+            listener.onProgress(String.format(Locale.ROOT, "[%d/%d] %s: warm-up",
+                    step, totalSteps, hevc ? "HEVC" : "H.264"));
+            runConfig(clip, MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL, glPrefs.glRenderer, result);
+
             for (int round = 0; round < ROUNDS && !cancelled; round++) {
-                for (int i = 0; i < MODES.length && !cancelled; i++) {
+                for (int j = 0; j < MODES.length && !cancelled; j++) {
+                    // Alternate the order so no configuration always runs first or last
+                    int i = (round % 2 == 0) ? j : MODES.length - 1 - j;
                     step++;
                     listener.onProgress(String.format(Locale.ROOT, "[%d/%d] %s: %s",
                             step, totalSteps, hevc ? "HEVC" : "H.264",
@@ -467,7 +484,8 @@ public class DecoderBenchmark {
     /**
      * Picks the valid configuration with the lowest p95 decode latency. A configuration other
      * than Moonlight's original one is only recommended if it is clearly better (by at least
-     * 0.5 ms and 5 % at p95); otherwise there is no measurable reason to deviate from it.
+     * 0.5 ms and 5 % at p95 on average) AND faster than the original in every single round;
+     * otherwise there is no reproducible reason to deviate from it.
      */
     static void chooseRecommendation(Result result) {
         ConfigResult best = null;
@@ -490,6 +508,13 @@ public class DecoderBenchmark {
                         "no significant gain over original (%.2f ms)", gain);
                 return;
             }
+            if (!fasterInEveryRound(best, original)) {
+                result.recommended = original;
+                // NB: no MediaCodecHelper calls here, this method is unit tested on the JVM
+                result.recommendationReason = String.format(Locale.ROOT,
+                        "a configuration was %.2f ms faster on average but not in every round", gain);
+                return;
+            }
             result.recommended = best;
             result.recommendationReason = String.format(Locale.ROOT, "%.2f ms faster than original at p95", gain);
             return;
@@ -498,20 +523,42 @@ public class DecoderBenchmark {
         result.recommendationReason = best == original ? "original is fastest" : "original configuration failed";
     }
 
+    private static boolean fasterInEveryRound(ConfigResult candidate, ConfigResult original) {
+        if (candidate.roundP95Ms.isEmpty() || candidate.roundP95Ms.size() != original.roundP95Ms.size()) {
+            // No per-round data to check
+            return true;
+        }
+        for (int i = 0; i < candidate.roundP95Ms.size(); i++) {
+            if (candidate.roundP95Ms.get(i) >= original.roundP95Ms.get(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String buildReport(Result result) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.ROOT, "Decoder benchmark: %s %s %dx%d@%d, %d+%d frames x %d rounds%n",
+        sb.append(String.format(Locale.ROOT, "Decoder benchmark: %s %s %dx%d@%d, %d+%d frames x %d rounds " +
+                        "(alternating order, after a discarded warm-up run)%n",
                 result.decoderName, hevc ? "HEVC" : "H.264", result.width, result.height, result.fps,
                 WARMUP_FRAMES, MEASURE_FRAMES, ROUNDS));
         sb.append(String.format(Locale.ROOT, "Display refresh: %.2f Hz%n%n", displayRefreshRate));
-        sb.append(String.format(Locale.ROOT, "%-9s %-7s %-7s %-7s %-7s %-6s %-7s %-7s %s%n",
-                "mode", "mean", "p50", "p95", "max", "out%", "dispFPS", "dispMs", "status / keys"));
+        sb.append(String.format(Locale.ROOT, "%-9s %-7s %-7s %-7s %-7s %-6s %-7s %-7s %-16s %s%n",
+                "mode", "mean", "p50", "p95", "max", "out%", "dispFPS", "dispMs", "p95 per round", "status / keys"));
         for (ConfigResult r : result.configs) {
-            sb.append(String.format(Locale.ROOT, "%-9s %-7.2f %-7.2f %-7.2f %-7.2f %-6.1f %-7s %-7s %s%n",
+            StringBuilder rounds = new StringBuilder();
+            for (Double p95 : r.roundP95Ms) {
+                if (rounds.length() > 0) {
+                    rounds.append('/');
+                }
+                rounds.append(String.format(Locale.ROOT, "%.2f", p95));
+            }
+            sb.append(String.format(Locale.ROOT, "%-9s %-7.2f %-7.2f %-7.2f %-7.2f %-6.1f %-7s %-7s %-16s %s%n",
                     MediaCodecHelper.lowLatencyModeName(r.mode),
                     r.decodeMeanMs, r.decodeP50Ms, r.decodeP95Ms, r.decodeMaxMs, r.decodedPercent,
                     r.displayedFps >= 0 ? String.format(Locale.ROOT, "%.1f", r.displayedFps) : "n/a",
                     r.displayMeanMs >= 0 ? String.format(Locale.ROOT, "%.2f", r.displayMeanMs) : "n/a",
+                    rounds,
                     (r.valid ? "OK" : "FAIL: " + r.error) + " | " + r.keys));
         }
         sb.append('\n');

@@ -32,15 +32,16 @@
     <!-- Performance overlay (values are mean / p95 over the last second) -->
     <string name="ull_overlay_header">ULL (mean / p95) · decoder LL mode: %1$s (%2$s)</string>
     <string name="ull_overlay_network">Network: frame receive %1$s · jitter %2$.2f ms · queue delay %3$s · %4$.1f Mbps</string>
-    <string name="ull_overlay_submit">To decoder: %1$s (input buffer wait %2$s)</string>
+    <string name="ull_overlay_submit">To decoder: %1$s (native→Java %2$s, input buffer wait %3$s)</string>
     <string name="ull_overlay_decode">Decode: %1$s · frames inside decoder: %2$d</string>
     <string name="ull_overlay_present">Release wait: %1$s · display (system) %2$s · replaced %3$.1f%%</string>
     <string name="ull_overlay_client">Client 1st packet → release: %1$s · → display: %2$s</string>
     <string name="ull_overlay_cpu">CPU (of one core): process %1$s · VideoRecv %2$s</string>
     <string name="ull_overlay_guard">Latency guard resyncs: %1$d</string>
     <string name="ull_overlay_decoder_saturated">WARNING: the decoder can\'t sustain this stream. Lower FPS, resolution or bitrate.</string>
-    <string name="ull_overlay_no_allm">TV without ALLM: enable the TV\'s Game mode manually</string>
-    <string name="ull_warning_no_allm">This TV does not support ALLM (automatic game mode). Enable the TV\'s Game mode manually: its picture processing can add tens of milliseconds.</string>
+    <string name="ull_overlay_no_allm">Display without ALLM (TV: enable Game mode; PC monitor: nothing to do)</string>
+    <string name="ull_warning_no_allm">The display (%1$s) does not advertise ALLM (automatic game mode). If it is a TV, enable its Game mode manually: TV picture processing can add tens of milliseconds. PC monitors usually don\'t process the image and need nothing.</string>
+    <string name="ull_display_unknown">name not reported</string>
     <string name="ull_warning_bitrate_link">%1$d Mbps (+FEC) is close to the %2$d Mbps Ethernet link: each frame needs ~%3$.1f ms on the wire and packets may be lost. 15–20 Mbps is recommended for 1080p60.</string>
     <string name="ull_overlay_network_congested">WARNING: sustained network queueing. Lower the bitrate or check the network.</string>
 
@@ -79,6 +80,7 @@
     <string name="ull_metric_queue_delay_p95">Queue delay p95 (ms, est.)</string>
     <string name="ull_metric_receive">Frame receive time (ms)</string>
     <string name="ull_metric_submit">Reassembled → decoder (ms)</string>
+    <string name="ull_metric_jni">…of which native → Java (ms)</string>
     <string name="ull_metric_decode">Decode mean (ms)</string>
     <string name="ull_metric_decode_p95">Decode p95 (ms)</string>
     <string name="ull_metric_pacing">Decoded → release (ms)</string>

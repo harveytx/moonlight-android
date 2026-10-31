@@ -18,11 +18,11 @@ import math
 import os
 import sys
 
-STAGES = ["receive", "submit", "input_wait", "decode", "pacing", "display",
+STAGES = ["receive", "submit", "jni", "input_wait", "decode", "pacing", "display",
           "client", "client_display", "queue_delay", "host"]
 COUNTERS = ["received_fps", "rendered_fps", "network_loss_percent", "render_drop_percent",
             "jitter_ms", "resyncs", "bitrate_mbps"]
-CSV_COLUMNS = ["receive_ms", "submit_ms", "input_wait_ms", "decode_ms", "pacing_ms",
+CSV_COLUMNS = ["receive_ms", "submit_ms", "jni_ms", "input_wait_ms", "decode_ms", "pacing_ms",
                "client_ms", "queue_delay_ms", "host_ms"]
 
 
@@ -43,6 +43,7 @@ def fmt(v):
 
 
 def stage_value(r, stage, key):
+    # Older reports (ULL.1/ULL.2) have no "jni" stage
     st = r.get("stages_ms", {}).get(stage)
     if not st or st.get("count", 0) == 0:
         return None

@@ -37,6 +37,19 @@ public final class StreamWarnings {
         return activity.getWindowManager().getDefaultDisplay().isMinimalPostProcessingSupported();
     }
 
+    /** Product name of the connected display from its EDID (Android 12+), or null. */
+    public static String getDisplayProductName(Activity activity) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return null;
+        }
+        android.hardware.display.DeviceProductInfo info =
+                activity.getWindowManager().getDefaultDisplay().getDeviceProductInfo();
+        if (info == null || info.getName() == null || info.getName().trim().isEmpty()) {
+            return null;
+        }
+        return info.getName().trim();
+    }
+
     /** Link speed in kbps if the active network is wired Ethernet, otherwise -1. */
     private static int getEthernetLinkKbps(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -67,7 +80,9 @@ public final class StreamWarnings {
             SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(activity);
             if (!sp.getBoolean(ALLM_WARNING_SHOWN_PREF, false)) {
                 sp.edit().putBoolean(ALLM_WARNING_SHOWN_PREF, true).apply();
-                warnings.add(activity.getString(R.string.ull_warning_no_allm));
+                String name = getDisplayProductName(activity);
+                warnings.add(activity.getString(R.string.ull_warning_no_allm,
+                        name != null ? name : activity.getString(R.string.ull_display_unknown)));
             }
         }
 

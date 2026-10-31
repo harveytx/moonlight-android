@@ -254,9 +254,23 @@ public final class DeviceCapabilityReport {
             }
             sb.append('\n');
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.hardware.display.DeviceProductInfo info = display.getDeviceProductInfo();
+            if (info != null) {
+                sb.append("product (EDID): ").append(info.getName())
+                        .append(", manufacturer PnP ID ").append(info.getManufacturerPnpId())
+                        .append(", product ID ").append(info.getProductId())
+                        .append(", year ").append(info.getModelYear() > 0 ? info.getModelYear() : info.getManufactureYear())
+                        .append(", connection ").append(info.getConnectionToSinkType()).append('\n');
+            }
+            else {
+                sb.append("product (EDID): not reported\n");
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // True when the TV supports ALLM or HDMI Game Content Type, which removes the TV's
             // own post-processing latency. The streaming activity requests it in the manifest.
+            // PC monitors normally don't advertise it and don't need it.
             sb.append("minimal post-processing (ALLM/Game Content Type) supported: ")
                     .append(display.isMinimalPostProcessingSupported()).append('\n');
         }

@@ -51,4 +51,31 @@ public class DecoderBenchmarkRecommendationTest {
         DecoderBenchmark.chooseRecommendation(result);
         assertNull(result.recommended);
     }
+
+    private static DecoderBenchmark.ConfigResult config(int mode, double p95, double... rounds) {
+        DecoderBenchmark.ConfigResult r = config(mode, p95, true);
+        for (double v : rounds) {
+            r.roundP95Ms.add(v);
+        }
+        return r;
+    }
+
+    @Test
+    public void rejectsGainThatIsNotReproducedInEveryRound() {
+        // Like the ZTE HEVC runs: better on average, but one round was slower than original
+        DecoderBenchmark.Result result = new DecoderBenchmark.Result();
+        result.configs.add(config(MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL, 3.4, 4.6, 2.6, 3.0));
+        result.configs.add(config(MediaCodecHelper.LOW_LATENCY_MODE_VENDOR, 2.7, 2.6, 2.8, 2.7));
+        DecoderBenchmark.chooseRecommendation(result);
+        assertEquals(MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL, result.recommended.mode);
+    }
+
+    @Test
+    public void acceptsGainReproducedInEveryRound() {
+        DecoderBenchmark.Result result = new DecoderBenchmark.Result();
+        result.configs.add(config(MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL, 4.0, 4.1, 3.9, 4.0));
+        result.configs.add(config(MediaCodecHelper.LOW_LATENCY_MODE_STANDARD, 2.6, 2.6, 2.5, 2.7));
+        DecoderBenchmark.chooseRecommendation(result);
+        assertEquals(MediaCodecHelper.LOW_LATENCY_MODE_STANDARD, result.recommended.mode);
+    }
 }
