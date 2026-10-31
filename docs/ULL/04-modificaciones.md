@@ -44,9 +44,23 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `tools/*` | Reloj de latencia, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.1.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.2.apk` | APK compilado (release, R8). |
 
-## 4.3 Compatibilidad
+## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
+
+| Archivo | Cambio |
+|---|---|
+| `binding/video/JitterEstimator.java` | Ignora los fotogramas duplicados de Sunshine (latencia de host 0) y descuenta la latencia de host del tránsito. |
+| `binding/video/PipelineStats.java` | Ventanas con doble búfer: el hilo de vídeo solo intercambia histogramas; percentiles y totales se calculan fuera del bloqueo. |
+| `binding/video/MediaCodecDecoderRenderer.java` | Hilo "Video - Stats" para resúmenes, CPU y overlay (antes en el hilo de recepción); modo de benchmark sin presentar; línea "TV sin ALLM"; la regla HEVC Amlogic se puede anular con un benchmark confirmado visualmente. |
+| `binding/video/MediaCodecHelper.java` | Modo "vendor" en Amlogic: solo claves anunciadas por el códec (`vendor.START.low-latency.enable` en este firmware); caché de parámetros de proveedor. |
+| `binding/video/DecoderTuningStore.java` | Confirmación visual del benchmark ("No" descarta el resultado). |
+| `diagnostics/DecoderBenchmark*.java`, `activity_ull_decoder_benchmark.xml` | Pregunta visual al terminar; prueba de rendimiento sin presentar; aviso sobre `dispMs`. |
+| `utils/StreamWarnings.java` (nuevo), `Game.java` | Avisos al iniciar: bitrate cerca del límite del Ethernet; TV sin ALLM (una vez). |
+| `app/build.gradle` | Versión `12.2-ULL.2` (31502). |
+| Tests | 30 (nuevos: fotogramas duplicados, latencia de host, ventanas repetidas, reinicio). |
+
+## 4.4 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

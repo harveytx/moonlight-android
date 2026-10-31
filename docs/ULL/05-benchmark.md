@@ -10,8 +10,13 @@
 | Funcionamiento en el ZTE B866V2K | ❌ **Pendiente** | Requiere el dispositivo (no disponible en el entorno de desarrollo, sin KVM para emulador) |
 | Mejora de latencia frente a Moonlight original | ❌ **Pendiente de medir** | Procedimiento de 5.3–5.5 |
 
-**No hay todavía resultados medidos en el ZTE.** Las cifras de este documento marcadas como
-*cálculo* o *hipótesis* no son resultados. La tabla de 5.7 está preparada para rellenarla.
+**Primeros resultados reales del ZTE: [09-resultados-zte.md](09-resultados-zte.md).** Las cifras de
+este documento marcadas como *cálculo* o *hipótesis* no son resultados. La tabla de 5.7 sigue
+pendiente de una prueba con imagen en movimiento.
+
+> Usa contenido en movimiento: con un escritorio estático Sunshine envía pocos fotogramas
+> (43–51 FPS y ~3 Mbps reales en las primeras sesiones del ZTE), y las métricas de red y bitrate no
+> significan nada.
 
 ## 5.2 Qué se mide y qué se estima
 
@@ -24,8 +29,8 @@
 | Liberación → presentación | **Reportada por Android** (`OnFrameRenderedListener`; puede faltar o llegar agrupada) | Sistema |
 | Total cliente (1er paquete → liberación / → presentación) | **Medida** / reportada | Suma de lo anterior |
 | FPS recibidos, decodificados, renderizados, presentados; fotogramas perdidos en red; reemplazados antes de mostrarse | **Medida** (contadores) | |
-| Jitter RFC 3550 | **Medida** (variación de tránsito; incluye variación del codificador del host) | PTS del host |
-| Retardo de cola | **Estimación** (respecto al mínimo de 10 s) | PTS del host |
+| Jitter RFC 3550 | **Medida** (variación del tránsito envío→llegada: PTS de captura + latencia del host; se ignoran los fotogramas duplicados de Sunshine) | PTS del host |
+| Retardo de cola | **Estimación** (respecto al mínimo de 10 s, mismos fotogramas) | PTS del host |
 | Procesamiento en el host | **Reportado por Sunshine** | Cabecera de fotograma |
 | RTT de red | **Medida** por ENet (moonlight-common-c) | Overlay original |
 | CPU del proceso y del hilo `VideoRecv` | **Medida** (/proc) | |

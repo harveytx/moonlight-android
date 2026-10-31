@@ -4,18 +4,20 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación — léelo antes que nada.**
-> Todo el código compila, el APK se genera y los 26 tests unitarios de la lógica nueva pasan.
-> **Nada se ha podido medir todavía en el ZTE**: el entorno de desarrollo no tiene el dispositivo
-> ni un emulador con aceleración. La app incluye las herramientas para obtener esas medidas en tu
-> equipo (benchmark del decodificador, informes por sesión y comparador A/B). No se declara ninguna
-> reducción de latencia que no esté medida; ver [05-benchmark.md](05-benchmark.md).
+> **Estado de la validación (versión 12.2-ULL.2).**
+> Compila, el APK se genera y los 30 tests unitarios pasan. Primeras medidas reales en el ZTE
+> ([09-resultados-zte.md](09-resultados-zte.md)): el SoC (S905Y4) y el firmware quedan confirmados, y
+> el benchmark midió que la configuración "standard" del decodificador H.264 reduce la decodificación
+> **0,87 ms de media y 1,56 ms en p95** (−27 % / −38 %) frente a la de Moonlight original.
+> **Aún no hay una comparación de extremo a extremo** con imagen en movimiento frente a la app
+> oficial: las sesiones enviadas eran de escritorio estático. No se declara ninguna otra reducción
+> de latencia que no esté medida.
 
 ## Qué cambia respecto a Moonlight original
 
 | Área | Cambio | Efecto esperado (a verificar en el ZTE) |
 |---|---|---|
-| Decodificador | El modo de baja latencia de MediaCodec se elige **por dispositivo, midiendo**: un benchmark en el propio equipo prueba 4 configuraciones y "Auto" usa la más rápida que funciona. Corrección conocida para HEVC Amlogic (efecto diapositiva). | De 0 a varios ms en decodificación, según el firmware. Nunca peor que la heurística original: si no hay mejora medible se mantiene la original. |
+| Decodificador | El modo de baja latencia de MediaCodec se elige **por dispositivo, midiendo**: un benchmark en el propio equipo prueba 4 configuraciones y "Auto" usa la más rápida que funciona. Corrección conocida para HEVC Amlogic (efecto diapositiva), con confirmación visual para anularla. | **Medido en el ZTE: −0,87 ms de media, −1,56 ms en p95** en H.264 1080p. |
 | Acumulación de latencia | **Protección contra acumulación**: si el decodificador no da abasto y se forma cola (incluida la del socket UDP, invisible en Moonlight original), resincroniza con un IDR. | Evita que la latencia crezca sin límite en decodificadores lentos. Sin efecto cuando el decodificador va sobrado. |
 | Prioridad de hilos | Los hilos nativos `VideoRecv`/`VideoDec` (antes con prioridad normal) y el hilo de render se suben a `URGENT_DISPLAY`. | Menos retrasos por planificación de CPU (p95/p99) en un Cortex-A35 con servicios de Android TV en segundo plano. |
 | moonlight-common-c | Actualizado a upstream (`5d3c0ec`): incluye la corrección que evitaba **hasta 120 fotogramas perdidos** tras ciertas pérdidas de paquetes sin RFI (el H.264 de Amlogic no usa RFI). | Recuperación de pérdidas más rápida. |
@@ -29,8 +31,8 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.1.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.1.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.2.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.2.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
@@ -50,6 +52,7 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 6. [06-zte-b866v2k.md](06-zte-b866v2k.md) — Hardware del ZTE, limitaciones y pruebas necesarias.
 7. [07-sunshine.md](07-sunshine.md) — Configuración recomendada de Sunshine.
 8. [08-compilacion.md](08-compilacion.md) — Cómo compilar futuras versiones.
+9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE** y cambios de la versión ULL.2.
 
 ## Herramientas (`tools/`)
 

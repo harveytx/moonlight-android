@@ -124,6 +124,15 @@ depacketizer esperando un IDR que nunca se pedía, descartando **hasta 120 fotog
 * Informe JSON por sesión + CSV por fotograma opcional + comparación A/B en la app y con
   `tools/compare-sessions.py` (incluye test de Mann-Whitney).
 
+### F2. Cambios de la versión ULL.2 (medidas del ZTE)
+
+* El hilo de recepción ya no calcula estadísticas: cada segundo solo intercambia los histogramas
+  activos por un juego de repuesto (O(1)) y delega percentiles, CPU y overlay en el hilo
+  "Video - Stats". Esto incluye el formateo del overlay original, que Moonlight hacía en el hilo de
+  recepción.
+* Jitter y retardo de cola sin fotogramas duplicados de Sunshine y descontando la latencia del host.
+* Ver [09-resultados-zte.md](09-resultados-zte.md#94-cambios-en-ull2-derivados-de-estos-datos).
+
 ### G. Perfiles y ajustes avanzados
 
 | | Ultra Low Latency (predet.) | Equilibrado | Máxima calidad | Moonlight original |
