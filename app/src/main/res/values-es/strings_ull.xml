@@ -39,6 +39,9 @@
     <string name="ull_overlay_cpu">CPU (de un núcleo): proceso %1$s · VideoRecv %2$s</string>
     <string name="ull_overlay_guard">Resincronizaciones de la protección de latencia: %1$d</string>
     <string name="ull_overlay_decoder_saturated">AVISO: el decodificador no sostiene esta transmisión. Baja FPS, resolución o bitrate.</string>
+    <string name="ull_overlay_no_allm">TV sin ALLM: activa a mano el Modo Juego del TV</string>
+    <string name="ull_warning_no_allm">Este TV no admite ALLM (modo juego automático). Activa a mano el Modo Juego del TV: su procesado de imagen puede añadir decenas de milisegundos.</string>
+    <string name="ull_warning_bitrate_link">%1$d Mbps (+FEC) está cerca del enlace Ethernet de %2$d Mbps: cada fotograma tarda ~%3$.1f ms en el cable y puede haber pérdidas. Se recomiendan 15–20 Mbps para 1080p60.</string>
     <string name="ull_overlay_network_congested">AVISO: cola de red sostenida. Baja el bitrate o revisa la red.</string>
 
     <!-- Diagnóstico -->
@@ -60,6 +63,11 @@
     <string name="ull_close">Cerrar</string>
     <string name="ull_bench_starting">Preparando el benchmark del decodificador…</string>
     <string name="ull_bench_running">Benchmark del decodificador %1$s — vigila el contador de fotogramas: debe avanzar con fluidez</string>
+    <string name="ull_bench_visual_question">¿El contador de fotogramas se movió con fluidez en todas las pasadas?</string>
+    <string name="ull_bench_visual_yes">Sí, fluido</string>
+    <string name="ull_bench_visual_no">No, hubo saltos</string>
+    <string name="ull_bench_visual_saved_yes">Confirmado. \"Auto\" usará la configuración medida (en HEVC de Amlogic sustituye a la regla de seguridad).</string>
+    <string name="ull_bench_visual_saved_no">Resultado descartado. \"Auto\" mantiene la heurística de Moonlight y las reglas de seguridad.</string>
     <string name="ull_compare_legend">B-A es la diferencia. \"+\" significa que B es mejor, \"-\" que B es peor. n/a: no medido en alguna de las sesiones.</string>
 
     <!-- Métricas de los informes -->

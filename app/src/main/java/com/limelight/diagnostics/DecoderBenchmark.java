@@ -191,8 +191,10 @@ public class DecoderBenchmark {
         return lastChange;
     }
 
-    private MediaCodecDecoderRenderer createRenderer(int mode, String glRenderer) {
-        MediaCodecDecoderRenderer renderer = new MediaCodecDecoderRenderer(activity, benchmarkPrefs(mode),
+    private MediaCodecDecoderRenderer createRenderer(int mode, String glRenderer, boolean discardOutput) {
+        PreferenceConfiguration prefs = benchmarkPrefs(mode);
+        prefs.benchmarkDiscardOutput = discardOutput;
+        MediaCodecDecoderRenderer renderer = new MediaCodecDecoderRenderer(activity, prefs,
                 new CrashListener() {
                     @Override
                     public void notifyCrash(Exception e) {
@@ -229,7 +231,7 @@ public class DecoderBenchmark {
         cr.mode = mode;
         rendererFailure = null;
 
-        MediaCodecDecoderRenderer renderer = createRenderer(mode, glRenderer);
+        MediaCodecDecoderRenderer renderer = createRenderer(mode, glRenderer, false);
         int format = hevc ? MoonBridge.VIDEO_FORMAT_H265 : MoonBridge.VIDEO_FORMAT_H264;
         if (hevc && !renderer.isHevcSupported()) {
             cr.valid = false;
@@ -309,7 +311,9 @@ public class DecoderBenchmark {
 
     private double measureThroughput(AnnexBClip clip, int mode, String glRenderer) {
         rendererFailure = null;
-        MediaCodecDecoderRenderer renderer = createRenderer(mode, glRenderer);
+        // Frames are decoded but not rendered: otherwise the result is capped by the display
+        // (a 60 Hz surface tops out around 2x its refresh rate), not by the decoder
+        MediaCodecDecoderRenderer renderer = createRenderer(mode, glRenderer, true);
         try {
             if (renderer.setup(hevc ? MoonBridge.VIDEO_FORMAT_H265 : MoonBridge.VIDEO_FORMAT_H264, WIDTH, HEIGHT, FPS) != 0) {
                 return -1;
@@ -527,6 +531,9 @@ public class DecoderBenchmark {
         }
         sb.append("\nDecode = queueInputBuffer() -> dequeueOutputBuffer(); measured with System.nanoTime().\n")
                 .append("dispMs = release -> display time reported by Android (OnFrameRenderedListener), if supported.\n")
+                .append("dispMs depends on the phase between the feed timer and vsync (it can differ by up to one\n")
+                .append("refresh between runs), so it is NOT used to compare configurations.\n")
+                .append("Max throughput is measured without rendering (decoder capacity only).\n")
                 .append("Network, host encoding and TV processing are NOT included. Verify visually that the\n")
                 .append("frame counter in the top-left corner moved smoothly during every run.\n");
         return sb.toString();

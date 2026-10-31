@@ -16,9 +16,14 @@ package com.limelight.binding.video;
  * the host processing latency (reported by Sunshine) and the queue delay, which is derived
  * from the host PTS and is therefore an estimate (see {@link JitterEstimator}).
  *
- * Thread-safety: all public methods are synchronized. They are called a handful of times
- * per frame from the input, renderer and frame-rendered callback threads, so contention
- * is negligible compared to a frame interval.
+ * Thread-safety: the per-frame methods are synchronized and O(1). They are called a handful
+ * of times per frame from the input, renderer and frame-rendered callback threads.
+ * Closing a measurement window ({@link #rollWindow}) only swaps the active histograms with
+ * a spare set while holding the lock; computing percentiles and merging into the session
+ * totals happens afterwards without blocking the video threads, so it should be called from
+ * a low priority statistics thread.
+ *
+ * Lock order when both are needed: this, then globalLock.
  */
 public class PipelineStats {
     public static final int STAGE_RECEIVE = 0;        // first packet -> frame reassembled
@@ -181,13 +186,25 @@ public class PipelineStats {
         }
     }
 
-    private final LatencyHistogram[] windowStages = new LatencyHistogram[STAGE_COUNT];
-    private final LatencyHistogram[] globalStages = new LatencyHistogram[STAGE_COUNT];
-    private final Counters windowCounters = new Counters();
-    private final Counters globalCounters = new Counters();
+    // Active window (guarded by this) and its spare, swapped by rollWindow()
+    private LatencyHistogram[] windowStages = newStageArray();
+    private Counters windowCounters = new Counters();
+    private LatencyHistogram[] spareStages = newStageArray();
+    private Counters spareCounters = new Counters();
     private long windowStartNs;
     private long sessionStartNs;
+
+    // Session totals and the window currently being folded into them (guarded by globalLock)
+    private final Object globalLock = new Object();
+    private final LatencyHistogram[] globalStages = newStageArray();
+    private final Counters globalCounters = new Counters();
     private long globalDurationNs;
+    private LatencyHistogram[] closingStages;
+    private Counters closingCounters;
+    private long closingDurationNs;
+    private long closingGeneration;
+    // Incremented by resetStatistics() so a window closed before the reset is discarded
+    private long generation;
 
     private final JitterEstimator jitterEstimator = new JitterEstimator();
 
@@ -209,11 +226,12 @@ public class PipelineStats {
     private long inFlight;
     private FrameLog frameLog;
 
-    public PipelineStats() {
+    private static LatencyHistogram[] newStageArray() {
+        LatencyHistogram[] stages = new LatencyHistogram[STAGE_COUNT];
         for (int i = 0; i < STAGE_COUNT; i++) {
-            windowStages[i] = new LatencyHistogram();
-            globalStages[i] = new LatencyHistogram();
+            stages[i] = new LatencyHistogram();
         }
+        return stages;
     }
 
     public synchronized void enableFrameLog(int capacityFrames) {
@@ -264,7 +282,7 @@ public class PipelineStats {
                                            int hostLatencyTenthsMs, int frameBytes) {
         startClocksIfNeeded(queuedNs);
 
-        long queueDelayNs = jitterEstimator.onFrame(receiveNs, hostPtsUs);
+        long queueDelayNs = jitterEstimator.onFrame(receiveNs, hostPtsUs, hostLatencyTenthsMs);
 
         windowCounters.framesReceived++;
         windowCounters.framesQueued++;
@@ -384,19 +402,30 @@ public class PipelineStats {
      * benchmark to exclude warm-up frames.
      */
     public synchronized void resetStatistics(long nowNs) {
-        for (int i = 0; i < STAGE_COUNT; i++) {
-            windowStages[i].reset();
-            globalStages[i].reset();
+        for (LatencyHistogram h : windowStages) {
+            h.reset();
         }
         windowCounters.clear();
-        globalCounters.clear();
-        globalDurationNs = 0;
         windowStartNs = nowNs;
         sessionStartNs = nowNs;
+        synchronized (globalLock) {
+            for (LatencyHistogram h : globalStages) {
+                h.reset();
+            }
+            globalCounters.clear();
+            globalDurationNs = 0;
+            generation++;
+        }
     }
 
     public synchronized long getTotalFramesDecoded() {
-        return globalCounters.framesDecoded + windowCounters.framesDecoded;
+        synchronized (globalLock) {
+            long total = globalCounters.framesDecoded + windowCounters.framesDecoded;
+            if (closingCounters != null && closingGeneration == generation) {
+                total += closingCounters.framesDecoded;
+            }
+            return total;
+        }
     }
 
     public synchronized long getDecoderInFlight() {
@@ -409,44 +438,96 @@ public class PipelineStats {
 
     /**
      * Closes the current measurement window, folds it into the session totals and returns
-     * a summary of the window that was just closed.
+     * a summary of the window that was just closed. The video threads are only blocked for
+     * the O(1) swap; call this from a statistics thread, not from the video threads.
+     * Must not be called concurrently with itself.
      */
-    public synchronized Snapshot rollWindow(long nowNs) {
-        startClocksIfNeeded(nowNs);
+    public Snapshot rollWindow(long nowNs) {
+        LatencyHistogram[] closed;
+        Counters closedCounters;
+        double jitterMs;
+        long closedDurationNs;
+        long closedGeneration;
 
+        synchronized (this) {
+            startClocksIfNeeded(nowNs);
+            closed = windowStages;
+            closedCounters = windowCounters;
+            windowStages = spareStages != null ? spareStages : newStageArray();
+            windowCounters = spareCounters != null ? spareCounters : new Counters();
+            spareStages = null;
+            spareCounters = null;
+            closedDurationNs = nowNs - windowStartNs;
+            windowStartNs = nowNs;
+            jitterMs = jitterEstimator.getJitterMs();
+
+            synchronized (globalLock) {
+                // Visible to getSessionSnapshot() until it has been merged
+                closingStages = closed;
+                closingCounters = closedCounters;
+                closingDurationNs = closedDurationNs;
+                closingGeneration = closedGeneration = generation;
+            }
+        }
+
+        // Percentiles are computed without holding any lock
         Snapshot snap = new Snapshot();
         for (int i = 0; i < STAGE_COUNT; i++) {
-            snap.stages[i] = StageSummary.of(windowStages[i]);
-            globalStages[i].merge(windowStages[i]);
-            windowStages[i].reset();
+            snap.stages[i] = StageSummary.of(closed[i]);
         }
-        snap.counters.copyFrom(windowCounters);
-        snap.durationSec = (nowNs - windowStartNs) / 1_000_000_000.0;
-        snap.jitterMs = jitterEstimator.getJitterMs();
+        snap.counters.copyFrom(closedCounters);
+        snap.durationSec = closedDurationNs / 1_000_000_000.0;
+        snap.jitterMs = jitterMs;
 
-        globalCounters.add(windowCounters);
-        globalDurationNs += nowNs - windowStartNs;
-        windowCounters.clear();
-        windowStartNs = nowNs;
+        synchronized (globalLock) {
+            if (closedGeneration == generation) {
+                for (int i = 0; i < STAGE_COUNT; i++) {
+                    globalStages[i].merge(closed[i]);
+                }
+                globalCounters.add(closedCounters);
+                globalDurationNs += closedDurationNs;
+            }
+            closingStages = null;
+            closingCounters = null;
+        }
+
+        for (LatencyHistogram h : closed) {
+            h.reset();
+        }
+        closedCounters.clear();
+        synchronized (this) {
+            spareStages = closed;
+            spareCounters = closedCounters;
+        }
 
         return snap;
     }
 
     /** Session totals, including the currently open window. */
     public synchronized Snapshot getSessionSnapshot(long nowNs) {
-        Snapshot snap = new Snapshot();
-        LatencyHistogram tmp = new LatencyHistogram();
-        for (int i = 0; i < STAGE_COUNT; i++) {
-            tmp.copyFrom(globalStages[i]);
-            tmp.merge(windowStages[i]);
-            snap.stages[i] = StageSummary.of(tmp);
+        synchronized (globalLock) {
+            boolean includeClosing = closingStages != null && closingGeneration == generation;
+            Snapshot snap = new Snapshot();
+            LatencyHistogram tmp = new LatencyHistogram();
+            for (int i = 0; i < STAGE_COUNT; i++) {
+                tmp.copyFrom(globalStages[i]);
+                if (includeClosing) {
+                    tmp.merge(closingStages[i]);
+                }
+                tmp.merge(windowStages[i]);
+                snap.stages[i] = StageSummary.of(tmp);
+            }
+            snap.counters.copyFrom(globalCounters);
+            if (includeClosing) {
+                snap.counters.add(closingCounters);
+            }
+            snap.counters.add(windowCounters);
+            long openWindowNs = windowStartNs != 0 ? nowNs - windowStartNs : 0;
+            snap.durationSec = (globalDurationNs + (includeClosing ? closingDurationNs : 0) + openWindowNs)
+                    / 1_000_000_000.0;
+            snap.jitterMs = jitterEstimator.getJitterMs();
+            return snap;
         }
-        snap.counters.copyFrom(globalCounters);
-        snap.counters.add(windowCounters);
-        long openWindowNs = windowStartNs != 0 ? nowNs - windowStartNs : 0;
-        snap.durationSec = (globalDurationNs + openWindowNs) / 1_000_000_000.0;
-        snap.jitterMs = jitterEstimator.getJitterMs();
-        return snap;
     }
 
     private static float ms(long ns) {

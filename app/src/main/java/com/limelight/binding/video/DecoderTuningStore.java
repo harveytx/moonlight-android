@@ -34,7 +34,32 @@ public final class DecoderTuningStore {
                 .putString(k + "|fingerprint", Build.FINGERPRINT)
                 .putLong(k + "|time", System.currentTimeMillis())
                 .putString(k + "|summary", summary)
+                .remove(k + "|visual")
                 .apply();
+    }
+
+    /**
+     * Records whether the user saw smooth playback (frame counter) during the benchmark.
+     * Frame presentation reported by Android can't always detect a decoder that decodes at
+     * full rate but only shows a few frames per second, so a "no" discards the result.
+     */
+    public static void setVisualCheck(Context context, String decoderName, String mimeType, boolean smooth) {
+        String k = key(decoderName, mimeType);
+        SharedPreferences.Editor editor = prefs(context).edit();
+        if (smooth) {
+            editor.putBoolean(k + "|visual", true);
+        }
+        else {
+            editor.remove(k + "|mode").remove(k + "|summary").remove(k + "|visual");
+        }
+        editor.apply();
+    }
+
+    public static boolean isVisuallyVerified(Context context, String decoderName, String mimeType) {
+        String k = key(decoderName, mimeType);
+        SharedPreferences p = prefs(context);
+        return Build.FINGERPRINT.equals(p.getString(k + "|fingerprint", null)) &&
+                p.getBoolean(k + "|visual", false);
     }
 
     /** @return the recommended MediaCodecHelper.LOW_LATENCY_MODE_* value, or -1 if none is stored */

@@ -11,6 +11,7 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 import com.limelight.R;
+import com.limelight.binding.video.DecoderTuningStore;
 import com.limelight.utils.UiHelper;
 
 /**
@@ -95,7 +96,7 @@ public class DecoderBenchmarkActivity extends Activity implements SurfaceHolder.
         benchmarkThread.start();
     }
 
-    private void showResults(DecoderBenchmark.Result result) {
+    private void showResults(final DecoderBenchmark.Result result) {
         if (isFinishing()) {
             return;
         }
@@ -104,9 +105,37 @@ public class DecoderBenchmarkActivity extends Activity implements SurfaceHolder.
         if (result.reportFile != null) {
             text = getString(R.string.ull_diag_saved_to, result.reportFile.getAbsolutePath()) + "\n\n" + text;
         }
-        ((TextView) findViewById(R.id.ull_bench_results)).setText(text);
+        final TextView resultsView = findViewById(R.id.ull_bench_results);
+        resultsView.setText(text);
         findViewById(R.id.ull_bench_results_panel).setVisibility(View.VISIBLE);
-        findViewById(R.id.ull_bench_close).requestFocus();
+
+        final View yes = findViewById(R.id.ull_bench_visual_yes);
+        final View no = findViewById(R.id.ull_bench_visual_no);
+        final TextView question = findViewById(R.id.ull_bench_visual_question);
+        if (result.recommended == null) {
+            // Nothing was stored, so there is nothing to confirm
+            yes.setVisibility(View.GONE);
+            no.setVisibility(View.GONE);
+            question.setVisibility(View.GONE);
+            findViewById(R.id.ull_bench_close).requestFocus();
+            return;
+        }
+
+        View.OnClickListener answer = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean smooth = v == yes;
+                DecoderTuningStore.setVisualCheck(DecoderBenchmarkActivity.this,
+                        result.decoderName, result.mime, smooth);
+                question.setText(smooth ? R.string.ull_bench_visual_saved_yes : R.string.ull_bench_visual_saved_no);
+                yes.setVisibility(View.GONE);
+                no.setVisibility(View.GONE);
+                findViewById(R.id.ull_bench_close).requestFocus();
+            }
+        };
+        yes.setOnClickListener(answer);
+        no.setOnClickListener(answer);
+        yes.requestFocus();
     }
 
     @Override

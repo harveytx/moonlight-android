@@ -133,11 +133,14 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     private final boolean trackDisplayTime;
     private HandlerThread frameRenderedThread;
     private Handler frameRenderedHandler;
+    private HandlerThread statsThread;
+    private volatile Handler statsHandler;
     private volatile boolean displayTimeReported;
     private long lastQueueInputTimeNs;
     private long pendingInputWaitNs;
     private long[] outputBufferPts = new long[32];
     private String nativeThreadPriorityInfo = "";
+    private final boolean allmSupported;
 
     private int numSpsIn;
     private int numPpsIn;
@@ -319,6 +322,8 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         this.activeWindowVideoStats = new VideoStats();
         this.lastWindowVideoStats = new VideoStats();
         this.globalVideoStats = new VideoStats();
+
+        this.allmSupported = com.limelight.utils.StreamWarnings.isMinimalPostProcessingSupported(activity);
 
         // ULL: the system-reported display time is only collected when someone will look at it
         this.trackDisplayTime = (prefs.enablePerfOverlay && prefs.detailedPerfOverlay) || prefs.recordSessions;
@@ -743,15 +748,21 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
             return requested;
         }
 
-        // Amlogic Codec2 HEVC decoders accept the low latency keys but then only present a
-        // few frames per second (moonlight-android #1584, S905Y4/S905X5 on Android 14).
-        // Configure succeeds, so the configure fallback can't catch it.
+        int benchmarked = DecoderTuningStore.getRecommendedMode(context, decoderInfo.getName(), mimeType);
+
+        // Amlogic Codec2 HEVC decoders accept the low latency keys but on some firmwares then
+        // only present a few frames per second (moonlight-android #1584/#1610, S905Y4/S905X5 on
+        // Android 14). Configure succeeds, so the configure fallback can't catch it. Only a
+        // benchmark result that the user confirmed as visually smooth on this firmware overrides it.
         if ("video/hevc".equals(mimeType) && MediaCodecHelper.isAmlogicDecoder(decoderInfo.getName())) {
+            if (benchmarked >= 0 && DecoderTuningStore.isVisuallyVerified(context, decoderInfo.getName(), mimeType)) {
+                lowLatencyModeReason = "on-device benchmark, visually verified";
+                return benchmarked;
+            }
             lowLatencyModeReason = "Amlogic HEVC quirk";
             return MediaCodecHelper.LOW_LATENCY_MODE_PRIORITY_ONLY;
         }
 
-        int benchmarked = DecoderTuningStore.getRecommendedMode(context, decoderInfo.getName(), mimeType);
         if (benchmarked >= 0) {
             lowLatencyModeReason = "on-device benchmark";
             return benchmarked;
@@ -1156,7 +1167,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                                     pipelineStats.onFrameOutput(presentationTimeUs, now);
                                 }
 
-                                if (prefs.framePacing == PreferenceConfiguration.FRAME_PACING_MAX_SMOOTHNESS ||
+                                if (prefs.benchmarkDiscardOutput) {
+                                    // ULL decoder benchmark: measure decoding capacity, not the display
+                                    videoDecoder.releaseOutputBuffer(lastIndex, false);
+                                }
+                                else if (prefs.framePacing == PreferenceConfiguration.FRAME_PACING_MAX_SMOOTHNESS ||
                                         prefs.framePacing == PreferenceConfiguration.FRAME_PACING_CAP_FPS) {
                                     // In max smoothness or cap FPS mode, we want to never drop frames
                                     // Use a PTS that will cause this frame to never be dropped
@@ -1167,7 +1182,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                                     // the same V-sync period
                                     videoDecoder.releaseOutputBuffer(lastIndex, System.nanoTime());
                                 }
-                                pipelineStats.onFrameReleased(presentationTimeUs, System.nanoTime(), true);
+                                pipelineStats.onFrameReleased(presentationTimeUs, System.nanoTime(), !prefs.benchmarkDiscardOutput);
 
                                 activeWindowVideoStats.totalFramesRendered++;
                             }
@@ -1304,6 +1319,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
     @Override
     public void start() {
+        // ULL: statistics and overlay work, kept off the video threads
+        statsThread = new HandlerThread("Video - Stats");
+        statsThread.start();
+        statsHandler = new Handler(statsThread.getLooper());
+
         startRendererThread();
         startChoreographerThread();
     }
@@ -1368,6 +1388,18 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
             // handle that here, we will re-interrupt the thread to set the interrupt
             // status back to true.
             Thread.currentThread().interrupt();
+        }
+
+        // ULL: let pending statistics windows be folded into the session totals
+        if (statsThread != null) {
+            statsHandler = null;
+            statsThread.quitSafely();
+            try {
+                statsThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            statsThread = null;
         }
     }
 
@@ -1510,49 +1542,21 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
         // Flip stats windows roughly every second
         if (SystemClock.uptimeMillis() >= activeWindowVideoStats.measurementStartTimestamp + 1000) {
-            // ULL: close the pipeline statistics window too
-            PipelineStats.Snapshot pipelineWindow = pipelineStats.rollWindow(entryNs);
-            cpuSampler.sample(entryNs);
-
-            if (prefs.enablePerfOverlay) {
-                VideoStats lastTwo = new VideoStats();
-                lastTwo.add(lastWindowVideoStats);
-                lastTwo.add(activeWindowVideoStats);
-                VideoStatsFps fps = lastTwo.getFps();
-                String decoder;
-
-                if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H264) != 0) {
-                    decoder = avcDecoder.getName();
-                } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H265) != 0) {
-                    decoder = hevcDecoder.getName();
-                } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_AV1) != 0) {
-                    decoder = av1Decoder.getName();
-                } else {
-                    decoder = "(unknown)";
-                }
-
-                float decodeTimeMs = (float)lastTwo.decoderTimeMs / lastTwo.totalFramesReceived;
-                long rttInfo = MoonBridge.getEstimatedRttInfo();
-                StringBuilder sb = new StringBuilder();
-                sb.append(context.getString(R.string.perf_overlay_streamdetails, initialWidth + "x" + initialHeight, fps.totalFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_decoder, decoder)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_incomingfps, fps.receivedFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_renderingfps, fps.renderedFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_netdrops,
-                        (float)lastTwo.framesLost / lastTwo.totalFrames * 100)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_netlatency,
-                        (int)(rttInfo >> 32), (int)rttInfo)).append('\n');
-                if (lastTwo.framesWithHostProcessingLatency > 0) {
-                    sb.append(context.getString(R.string.perf_overlay_hostprocessinglatency,
-                            (float)lastTwo.minHostProcessingLatency / 10,
-                            (float)lastTwo.maxHostProcessingLatency / 10,
-                            (float)lastTwo.totalHostProcessingLatency / 10 / lastTwo.framesWithHostProcessingLatency)).append('\n');
-                }
-                sb.append(context.getString(R.string.perf_overlay_dectime, decodeTimeMs));
-                if (prefs.detailedPerfOverlay) {
-                    appendDetailedPerfOverlay(sb, pipelineWindow);
-                }
-                perfListener.onPerfUpdate(sb.toString());
+            // ULL: this is the video receive thread, so only O(1) bookkeeping happens here.
+            // Percentiles, CPU sampling and overlay formatting run on the statistics thread.
+            final VideoStats lastTwo = new VideoStats();
+            lastTwo.add(lastWindowVideoStats);
+            lastTwo.add(activeWindowVideoStats);
+            final VideoStatsFps fps = lastTwo.getFps();
+            final long windowEndNs = entryNs;
+            Handler handler = statsHandler;
+            if (handler != null) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        onStatsWindowClosed(lastTwo, fps, windowEndNs);
+                    }
+                });
             }
 
             globalVideoStats.add(activeWindowVideoStats);
@@ -1872,6 +1876,50 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         return MoonBridge.DR_OK;
     }
 
+    // ULL: runs on the statistics thread once per second
+    private void onStatsWindowClosed(VideoStats lastTwo, VideoStatsFps fps, long windowEndNs) {
+        PipelineStats.Snapshot pipelineWindow = pipelineStats.rollWindow(windowEndNs);
+        cpuSampler.sample(windowEndNs);
+
+        if (!prefs.enablePerfOverlay || stopping) {
+            return;
+        }
+
+        String decoder;
+        if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H264) != 0) {
+            decoder = avcDecoder.getName();
+        } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H265) != 0) {
+            decoder = hevcDecoder.getName();
+        } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_AV1) != 0) {
+            decoder = av1Decoder.getName();
+        } else {
+            decoder = "(unknown)";
+        }
+
+        float decodeTimeMs = (float)lastTwo.decoderTimeMs / lastTwo.totalFramesReceived;
+        long rttInfo = MoonBridge.getEstimatedRttInfo();
+        StringBuilder sb = new StringBuilder();
+        sb.append(context.getString(R.string.perf_overlay_streamdetails, initialWidth + "x" + initialHeight, fps.totalFps)).append('\n');
+        sb.append(context.getString(R.string.perf_overlay_decoder, decoder)).append('\n');
+        sb.append(context.getString(R.string.perf_overlay_incomingfps, fps.receivedFps)).append('\n');
+        sb.append(context.getString(R.string.perf_overlay_renderingfps, fps.renderedFps)).append('\n');
+        sb.append(context.getString(R.string.perf_overlay_netdrops,
+                (float)lastTwo.framesLost / lastTwo.totalFrames * 100)).append('\n');
+        sb.append(context.getString(R.string.perf_overlay_netlatency,
+                (int)(rttInfo >> 32), (int)rttInfo)).append('\n');
+        if (lastTwo.framesWithHostProcessingLatency > 0) {
+            sb.append(context.getString(R.string.perf_overlay_hostprocessinglatency,
+                    (float)lastTwo.minHostProcessingLatency / 10,
+                    (float)lastTwo.maxHostProcessingLatency / 10,
+                    (float)lastTwo.totalHostProcessingLatency / 10 / lastTwo.framesWithHostProcessingLatency)).append('\n');
+        }
+        sb.append(context.getString(R.string.perf_overlay_dectime, decodeTimeMs));
+        if (prefs.detailedPerfOverlay) {
+            appendDetailedPerfOverlay(sb, pipelineWindow);
+        }
+        perfListener.onPerfUpdate(sb.toString());
+    }
+
     private static String fmtStage(PipelineStats.StageSummary stage) {
         if (stage == null || stage.count == 0) {
             return "n/a";
@@ -1907,6 +1955,10 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         sb.append('\n').append(context.getString(R.string.ull_overlay_cpu,
                 cpu >= 0 ? String.format(Locale.ROOT, "%.0f%%", cpu) : "n/a",
                 recvCpu >= 0 ? String.format(Locale.ROOT, "%.0f%%", recvCpu) : "n/a"));
+
+        if (!allmSupported) {
+            sb.append('\n').append(context.getString(R.string.ull_overlay_no_allm));
+        }
 
         if (latencyGuard != null) {
             sb.append('\n').append(context.getString(R.string.ull_overlay_guard, latencyGuard.getResyncCount()));

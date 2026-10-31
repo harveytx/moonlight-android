@@ -46,11 +46,38 @@
                 android:textSize="13sp" />
         </ScrollView>
 
-        <Button
-            android:id="@+id/ull_bench_close"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:text="@string/ull_close" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/ull_bench_visual_question"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/ull_bench_visual_question"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/ull_bench_visual_yes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_bench_visual_yes" />
+
+            <Button
+                android:id="@+id/ull_bench_visual_no"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_bench_visual_no" />
+
+            <Button
+                android:id="@+id/ull_bench_close"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_close" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>

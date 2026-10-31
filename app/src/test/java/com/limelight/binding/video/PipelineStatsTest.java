@@ -80,4 +80,42 @@ public class PipelineStatsTest {
         s.onDecoderReset();
         assertEquals(0, s.getDecoderInFlight());
     }
+
+    @Test
+    public void repeatedRollsKeepWindowsSeparate() {
+        PipelineStats s = new PipelineStats();
+        long t = 10_000 * MS;
+        long pts = 1000;
+        for (int window = 1; window <= 5; window++) {
+            // window N has N frames with N ms decode time
+            for (int f = 0; f < window; f++) {
+                s.onFrameQueued(pts, (int) pts, t, t, 0, t, 0, 0, 100);
+                s.onFrameOutput(pts, t + window * MS);
+                pts++;
+            }
+            PipelineStats.Snapshot w = s.rollWindow(t + window * 1000 * MS);
+            assertEquals(window, w.counters.framesDecoded);
+            assertEquals(window, w.stages[PipelineStats.STAGE_DECODE].meanMs, 0.03);
+        }
+        PipelineStats.Snapshot session = s.getSessionSnapshot(t + 5000 * MS);
+        assertEquals(15, session.counters.framesDecoded);
+        assertEquals(15, s.getTotalFramesDecoded());
+        // (1*1 + 2*2 + 3*3 + 4*4 + 5*5) / 15
+        assertEquals(55.0 / 15.0, session.stages[PipelineStats.STAGE_DECODE].meanMs, 0.03);
+    }
+
+    @Test
+    public void resetDiscardsEverythingBefore() {
+        PipelineStats s = new PipelineStats();
+        long t = 10_000 * MS;
+        s.onFrameQueued(1000, 1, t, t, 0, t, 0, 0, 100);
+        s.onFrameOutput(1000, t + 50 * MS);
+        s.rollWindow(t + 1000 * MS);
+        s.resetStatistics(t + 1000 * MS);
+        s.onFrameQueued(2000, 2, t, t, 0, t, 0, 0, 100);
+        s.onFrameOutput(2000, t + 2 * MS);
+        PipelineStats.Snapshot session = s.getSessionSnapshot(t + 2000 * MS);
+        assertEquals(1, session.counters.framesDecoded);
+        assertEquals(2.0, session.stages[PipelineStats.STAGE_DECODE].meanMs, 0.03);
+    }
 }

@@ -681,8 +681,41 @@ public class MediaCodecHelper {
                 videoFormat.setInteger("vendor.rtc-ext-dec-low-latency.enable", 1);
             }
             else if (isDecoderInList(amlogicDecoderPrefixes, name)) {
-                videoFormat.setInteger("vendor.low-latency.enable", 1);
+                // Amlogic firmwares differ: older ones accept vendor.low-latency.enable, while the
+                // S905Y4 Android 14 firmware of the ZTE B866V2K only advertises
+                // vendor.START.low-latency.enable. Where the codec can tell us (Android 12+),
+                // only set the keys it advertises.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    List<String> advertised = getCachedVendorParameters(name);
+                    for (String key : AMLOGIC_VENDOR_LOW_LATENCY_KEYS) {
+                        if (advertised.contains(key)) {
+                            videoFormat.setInteger(key, 1);
+                        }
+                    }
+                }
+                else {
+                    videoFormat.setInteger("vendor.low-latency.enable", 1);
+                }
             }
+        }
+    }
+
+    private static final String[] AMLOGIC_VENDOR_LOW_LATENCY_KEYS = {
+            "vendor.low-latency.enable",
+            "vendor.START.low-latency.enable",
+    };
+
+    // Querying vendor parameters instantiates a codec, so remember the answer per decoder
+    private static final java.util.Map<String, List<String>> vendorParameterCache = new java.util.HashMap<>();
+
+    private static List<String> getCachedVendorParameters(String decoderName) {
+        synchronized (vendorParameterCache) {
+            List<String> params = vendorParameterCache.get(decoderName);
+            if (params == null) {
+                params = getSupportedVendorParameters(decoderName);
+                vendorParameterCache.put(decoderName, params);
+            }
+            return params;
         }
     }
 
@@ -696,6 +729,7 @@ public class MediaCodecHelper {
             "vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-req",
             "vendor.rtc-ext-dec-low-latency.enable",
             "vendor.low-latency.enable",
+            "vendor.START.low-latency.enable",
     };
 
     /** ULL: Describes the low latency keys present in a configured format, for diagnostics. */

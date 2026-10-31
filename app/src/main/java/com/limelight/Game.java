@@ -37,6 +37,7 @@ import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.SpinnerDialog;
 import com.limelight.utils.StreamThreadPriority;
+import com.limelight.utils.StreamWarnings;
 import com.limelight.utils.UiHelper;
 
 import android.annotation.SuppressLint;
@@ -289,6 +290,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (connMgr.isActiveNetworkMetered()) {
             displayTransientMessage(getResources().getString(R.string.conn_metered));
+        }
+
+        // ULL: bitrate close to the Ethernet link speed, TV without ALLM
+        for (String warning : StreamWarnings.getStartupWarnings(this, prefConfig)) {
+            displayTransientMessage(warning);
         }
 
         // Make sure Wi-Fi is fully powered up

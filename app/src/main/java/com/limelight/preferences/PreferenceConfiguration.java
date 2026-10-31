@@ -178,6 +178,8 @@ public class PreferenceConfiguration {
     public boolean detailedPerfOverlay;
     public boolean recordSessions;
     public boolean recordFrameLog;
+    // Decoder benchmark only (never persisted): release decoded frames without rendering them
+    public boolean benchmarkDiscardOutput;
 
     public static boolean isNativeResolution(int width, int height) {
         // It's not a native resolution if it matches an existing resolution option

@@ -5,16 +5,24 @@ package com.limelight.binding.video;
  * changes, using the host presentation timestamp that Sunshine already sends in every
  * RTP packet.
  *
- * transit = localArrival - hostPts. The absolute value is meaningless (different clocks),
- * but its variation is not:
+ * Sunshine sets the RTP timestamp to the capture time of the frame and reports the host
+ * processing latency (capture -> packetization) in the frame header. Duplicate frames, which
+ * Sunshine sends when the captured content didn't change, have no capture time: their
+ * timestamp comes from the rate control schedule and their host latency is 0. Mixing both
+ * time bases produced bogus "queueing" of up to ~30 ms on a mostly static desktop, so
+ * frames without host latency are ignored.
+ *
+ * transit = localArrival - (hostPts + hostProcessingLatency), i.e. from the moment the host
+ * started sending the frame to the arrival of its first packet. The absolute value is
+ * meaningless (different clocks), but its variation is not:
  *  - Jitter is the RFC 3550 interarrival jitter estimator: J += (|D| - J) / 16.
  *  - Queue delay is transit minus the minimum transit seen over a sliding window
  *    (~10 s). It grows when packets wait anywhere between the encoder output and our
  *    recvfrom() call: network queues, Wi-Fi retries, or our own socket buffer when the
  *    decoder can't keep up. The sliding window tracks slow clock drift between hosts.
  *
- * Host-side encoder time variation also shows up here; the host processing latency
- * reported by Sunshine can be used to tell them apart.
+ * Subtracting the host processing latency removes encoder time variation, so what is left
+ * is the network path plus our own socket queue.
  *
  * Not thread-safe.
  */
@@ -50,14 +58,16 @@ public class JitterEstimator {
     /**
      * @param arrivalNs local arrival time of the first packet of the frame (System.nanoTime() base)
      * @param hostPtsUs host presentation timestamp of the frame, 0 if unknown
+     * @param hostLatencyTenthsMs host processing latency in 0.1 ms units, 0 for duplicate frames
      * @return queue delay in ns relative to the windowed minimum transit, or -1 if unavailable
      */
-    public long onFrame(long arrivalNs, long hostPtsUs) {
-        if (hostPtsUs <= 0) {
+    public long onFrame(long arrivalNs, long hostPtsUs, int hostLatencyTenthsMs) {
+        if (hostPtsUs <= 0 || hostLatencyTenthsMs <= 0) {
+            // Unknown PTS, or a duplicate frame whose timestamp isn't a capture time
             return -1;
         }
 
-        long transitNs = arrivalNs - hostPtsUs * 1000;
+        long transitNs = arrivalNs - (hostPtsUs * 1000 + hostLatencyTenthsMs * 100_000L);
 
         if (hasLast && Math.abs(transitNs - lastTransitNs) > RESET_THRESHOLD_NS) {
             reset();
