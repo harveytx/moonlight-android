@@ -227,6 +227,19 @@ public final class DeviceCapabilityReport {
         }
     }
 
+    private static String connectionName(int type) {
+        switch (type) {
+            case 1:
+                return "built-in";
+            case 2:
+                return "direct";
+            case 3:
+                return "transitive (via another device, e.g. AV receiver)";
+            default:
+                return "unknown";
+        }
+    }
+
     private static void appendDisplay(StringBuilder sb, Activity activity) {
         Display display = activity.getWindowManager().getDefaultDisplay();
         sb.append("\n== Display ==\n");
@@ -261,7 +274,7 @@ public final class DeviceCapabilityReport {
                         .append(", manufacturer PnP ID ").append(info.getManufacturerPnpId())
                         .append(", product ID ").append(info.getProductId())
                         .append(", year ").append(info.getModelYear() > 0 ? info.getModelYear() : info.getManufactureYear())
-                        .append(", connection ").append(info.getConnectionToSinkType()).append('\n');
+                        .append(", connection ").append(connectionName(info.getConnectionToSinkType())).append('\n');
             }
             else {
                 sb.append("product (EDID): not reported\n");

@@ -63,8 +63,8 @@
     <string name="ull_diag_tuning_cleared">Decoder benchmark results cleared. \"Auto\" will use Moonlight\'s heuristics until the benchmark is run again.</string>
     <string name="ull_close">Close</string>
     <string name="ull_bench_starting">Preparing decoder benchmark…</string>
-    <string name="ull_bench_running">Decoder benchmark %1$s — watch the frame counter: it must move smoothly</string>
-    <string name="ull_bench_visual_question">Did the frame counter move smoothly in every run?</string>
+    <string name="ull_bench_running">Decoder benchmark %1$s — watch the frame counter: within each run it must move smoothly</string>
+    <string name="ull_bench_visual_question">Did the frame counter move smoothly within every run? (Restarting at 0 when a run begins and a short stop when it ends are normal.)</string>
     <string name="ull_bench_visual_yes">Yes, smooth</string>
     <string name="ull_bench_visual_no">No, it stuttered</string>
     <string name="ull_bench_visual_saved_yes">Confirmed. "Auto" will use the measured configuration (for Amlogic HEVC this replaces the safety rule).</string>

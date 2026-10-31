@@ -143,10 +143,26 @@ public class DecoderBenchmark {
 
     // Feeds frames; returns the number of DR_NEED_IDR results
     private int feed(MediaCodecDecoderRenderer renderer, AnnexBClip clip, int[] cursor, int frames, boolean paced) {
+        return feed(renderer, clip, cursor, frames, paced, -1);
+    }
+
+    /**
+     * Feeds frames at a steady cadence. If resetAfterFrames >= 0, the statistics are reset after
+     * that many frames without interrupting the stream, so warm-up frames are excluded but there
+     * is no visible pause (a pause here looked like a decoder stutter during the visual check).
+     * Returns the number of DR_NEED_IDR results after the reset.
+     */
+    private int feed(MediaCodecDecoderRenderer renderer, AnnexBClip clip, int[] cursor, int frames,
+                     boolean paced, int resetAfterFrames) {
         long intervalNs = 1_000_000_000L / FPS;
         long next = System.nanoTime();
         int needIdr = 0;
         for (int i = 0; i < frames && !cancelled && rendererFailure == null; i++) {
+            if (i == resetAfterFrames) {
+                renderer.getPipelineStats().resetStatistics(System.nanoTime());
+                needIdr = 0;
+            }
+
             // cursor[0] = clip position, cursor[1] = frame number
             AnnexBClip.AccessUnit au = clip.accessUnits.get(cursor[0]);
             long ptsUs = (long) cursor[1] * 1_000_000L / FPS;
@@ -265,11 +281,10 @@ public class DecoderBenchmark {
             renderer.start();
             started = true;
             int[] cursor = {0, 1};
-            feed(renderer, clip, cursor, WARMUP_FRAMES, true);
-            waitForDrain(renderer.getPipelineStats());
-            renderer.getPipelineStats().resetStatistics(System.nanoTime());
-
-            cr.idrRequests = feed(renderer, clip, cursor, MEASURE_FRAMES, true);
+            // Warm-up and measurement in one continuous stream. The one or two warm-up frames
+            // still inside the decoder at the reset are counted on output; their decode times
+            // are normal steady-state samples.
+            cr.idrRequests = feed(renderer, clip, cursor, WARMUP_FRAMES + MEASURE_FRAMES, true, WARMUP_FRAMES);
             waitForDrain(renderer.getPipelineStats());
             PipelineStats.Snapshot s = renderer.getPipelineStats().getSessionSnapshot(System.nanoTime());
 
@@ -280,8 +295,9 @@ public class DecoderBenchmark {
             cr.decodeMaxMs = decode.maxMs;
             cr.roundP95Ms.add(decode.p95Ms);
             cr.submitMeanMs = s.stages[PipelineStats.STAGE_SUBMIT].meanMs;
+            // Warm-up frames that come out after the reset can push this slightly above 100 %
             cr.decodedPercent = s.counters.framesQueued > 0 ?
-                    100.0 * s.counters.framesDecoded / s.counters.framesQueued : 0;
+                    Math.min(100.0, 100.0 * s.counters.framesDecoded / s.counters.framesQueued) : 0;
             if (renderer.isDisplayTimeReported() && s.counters.framesDisplayed > 0) {
                 cr.displayedFps = s.fps(s.counters.framesDisplayed);
                 cr.displayMeanMs = s.stages[PipelineStats.STAGE_DISPLAY].meanMs;

@@ -63,8 +63,8 @@
     <string name="ull_diag_tuning_cleared">Resultados del benchmark borrados. \"Auto\" usará la heurística de Moonlight hasta que se vuelva a ejecutar el benchmark.</string>
     <string name="ull_close">Cerrar</string>
     <string name="ull_bench_starting">Preparando el benchmark del decodificador…</string>
-    <string name="ull_bench_running">Benchmark del decodificador %1$s — vigila el contador de fotogramas: debe avanzar con fluidez</string>
-    <string name="ull_bench_visual_question">¿El contador de fotogramas se movió con fluidez en todas las pasadas?</string>
+    <string name="ull_bench_running">Benchmark del decodificador %1$s — vigila el contador: dentro de cada pasada debe avanzar con fluidez</string>
+    <string name="ull_bench_visual_question">¿El contador se movió con fluidez dentro de cada pasada? (Es normal que vuelva a 0 al empezar cada pasada y que se detenga un instante al terminarla.)</string>
     <string name="ull_bench_visual_yes">Sí, fluido</string>
     <string name="ull_bench_visual_no">No, hubo saltos</string>
     <string name="ull_bench_visual_saved_yes">Confirmado. \"Auto\" usará la configuración medida (en HEVC de Amlogic sustituye a la regla de seguridad).</string>
