@@ -44,7 +44,7 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `tools/*` | Reloj de latencia, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.2.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.3.apk` | APK compilado (release, R8). |
 
 ## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
 
@@ -60,7 +60,17 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `app/build.gradle` | Versión `12.2-ULL.2` (31502). |
 | Tests | 30 (nuevos: fotogramas duplicados, latencia de host, ventanas repetidas, reinicio). |
 
-## 4.4 Compatibilidad
+## 4.4 Versión 12.2-ULL.3
+
+| Archivo | Cambio |
+|---|---|
+| `diagnostics/DecoderBenchmark.java` | Ejecución de calentamiento descartada; 3 rondas con orden alterno; una configuración distinta de la original solo se recomienda si es más rápida en todas las rondas; p95 por ronda en el informe. |
+| `binding/video/PipelineStats.java`, `MediaCodecDecoderRenderer.java`, `diagnostics/SessionReport.java`, `tools/compare-sessions.py` | Nueva etapa `jni` (reensamblado → entrada en Java), columna `jni_ms` en el CSV, línea en el overlay. |
+| `utils/StreamWarnings.java`, `diagnostics/DeviceCapabilityReport.java`, strings | Aviso de ALLM válido para TV y monitores; nombre EDID de la pantalla. |
+| `app/build.gradle` | Versión `12.2-ULL.3` (31503). |
+| Tests | 32. |
+
+## 4.5 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

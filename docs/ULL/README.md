@@ -4,20 +4,21 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación (versión 12.2-ULL.2).**
-> Compila, el APK se genera y los 30 tests unitarios pasan. Primeras medidas reales en el ZTE
-> ([09-resultados-zte.md](09-resultados-zte.md)): el SoC (S905Y4) y el firmware quedan confirmados, y
-> el benchmark midió que la configuración "standard" del decodificador H.264 reduce la decodificación
-> **0,87 ms de media y 1,56 ms en p95** (−27 % / −38 %) frente a la de Moonlight original.
-> **Aún no hay una comparación de extremo a extremo** con imagen en movimiento frente a la app
-> oficial: las sesiones enviadas eran de escritorio estático. No se declara ninguna otra reducción
-> de latencia que no esté medida.
+> **Estado de la validación (versión 12.2-ULL.3).**
+> Compila, el APK se genera y los 32 tests unitarios pasan. Medidas reales en el ZTE
+> ([09-resultados-zte.md](09-resultados-zte.md)): SoC S905Y4 confirmado. En este equipo, la
+> configuración de decodificador de Moonlight original ya es óptima (H.264 1080p ≈ 2,3 ms con
+> `low-latency=1`). La mejora de "standard" que se anunció en ULL.2 **no se reprodujo** y se ha
+> retirado. Lo que sí está medido: el bitrate cuesta ~0,19 ms de recepción por Mbps en el Ethernet de
+> 100 Mbps, y liberar el fotograma al instante ahorra ~6–8 ms frente a "equilibrado".
+> **Aún no hay una sesión del perfil ULL con imagen en movimiento** ni una comparación con la app
+> oficial. No se declara ninguna reducción de latencia que no esté medida.
 
 ## Qué cambia respecto a Moonlight original
 
 | Área | Cambio | Efecto esperado (a verificar en el ZTE) |
 |---|---|---|
-| Decodificador | El modo de baja latencia de MediaCodec se elige **por dispositivo, midiendo**: un benchmark en el propio equipo prueba 4 configuraciones y "Auto" usa la más rápida que funciona. Corrección conocida para HEVC Amlogic (efecto diapositiva), con confirmación visual para anularla. | **Medido en el ZTE: −0,87 ms de media, −1,56 ms en p95** en H.264 1080p. |
+| Decodificador | El modo de baja latencia de MediaCodec se elige **por dispositivo, midiendo**: un benchmark en el propio equipo prueba 4 configuraciones y "Auto" solo se aparta de la original si la mejora se repite en todas las rondas. Corrección conocida para HEVC Amlogic (efecto diapositiva), con confirmación visual para anularla. | **Medido en el ZTE:** la configuración original ya es la mejor en H.264 (~2,3 ms); sin baja latencia, ~10 ms. |
 | Acumulación de latencia | **Protección contra acumulación**: si el decodificador no da abasto y se forma cola (incluida la del socket UDP, invisible en Moonlight original), resincroniza con un IDR. | Evita que la latencia crezca sin límite en decodificadores lentos. Sin efecto cuando el decodificador va sobrado. |
 | Prioridad de hilos | Los hilos nativos `VideoRecv`/`VideoDec` (antes con prioridad normal) y el hilo de render se suben a `URGENT_DISPLAY`. | Menos retrasos por planificación de CPU (p95/p99) en un Cortex-A35 con servicios de Android TV en segundo plano. |
 | moonlight-common-c | Actualizado a upstream (`5d3c0ec`): incluye la corrección que evitaba **hasta 120 fotogramas perdidos** tras ciertas pérdidas de paquetes sin RFI (el H.264 de Amlogic no usa RFI). | Recuperación de pérdidas más rápida. |
@@ -31,8 +32,8 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.2.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.2.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.3.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.3.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
