@@ -1,0 +1,313 @@
+package com.limelight.diagnostics;
+
+import android.content.Context;
+import android.os.Build;
+
+import com.limelight.BuildConfig;
+import com.limelight.LimeLog;
+import com.limelight.R;
+import com.limelight.binding.video.MediaCodecDecoderRenderer;
+import com.limelight.binding.video.PipelineStats;
+import com.limelight.preferences.PreferenceConfiguration;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Stores a summary of every streaming session (and optionally a per-frame CSV) so that
+ * different configurations can be compared later under the same conditions.
+ *
+ * Files live in the app-specific external storage directory, which needs no permission and
+ * can be pulled with: adb pull /sdcard/Android/data/<package>/files/ull-sessions
+ */
+public final class SessionReport {
+    private static final String DIRECTORY = "ull-sessions";
+    private static final int MIN_FRAMES_FOR_REPORT = 60;
+
+    private SessionReport() {
+    }
+
+    public static File getDirectory(Context context) {
+        File base = context.getExternalFilesDir(null);
+        if (base == null) {
+            base = context.getFilesDir();
+        }
+        File dir = new File(base, DIRECTORY);
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir;
+    }
+
+    private static JSONObject stageJson(PipelineStats.StageSummary s) throws JSONException {
+        JSONObject o = new JSONObject();
+        o.put("count", s.count);
+        o.put("mean_ms", round(s.meanMs));
+        o.put("min_ms", round(s.minMs));
+        o.put("p50_ms", round(s.p50Ms));
+        o.put("p95_ms", round(s.p95Ms));
+        o.put("p99_ms", round(s.p99Ms));
+        o.put("max_ms", round(s.maxMs));
+        return o;
+    }
+
+    private static double round(double v) {
+        return Math.round(v * 1000.0) / 1000.0;
+    }
+
+    /**
+     * Saves the report of a finished session. Must be called after the decoder has been
+     * stopped so the statistics are final.
+     *
+     * @return the report file, or null if the session was too short or saving failed
+     */
+    public static File save(Context context, MediaCodecDecoderRenderer renderer,
+                            PreferenceConfiguration prefs, String hostName, String appName) {
+        PipelineStats stats = renderer.getPipelineStats();
+        PipelineStats.Snapshot snap = stats.getSessionSnapshot(System.nanoTime());
+        if (snap.counters.framesReceived < MIN_FRAMES_FOR_REPORT) {
+            return null;
+        }
+
+        try {
+            JSONObject root = new JSONObject();
+            String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
+            root.put("format", "moonlight-ull-session-1");
+            root.put("timestamp", timestamp);
+            root.put("app_version", BuildConfig.VERSION_NAME);
+            root.put("host", hostName != null ? hostName : "");
+            root.put("app", appName != null ? appName : "");
+
+            JSONObject device = new JSONObject();
+            device.put("manufacturer", Build.MANUFACTURER);
+            device.put("model", Build.MODEL);
+            device.put("device", Build.DEVICE);
+            device.put("hardware", Build.HARDWARE);
+            device.put("android", Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                device.put("soc", Build.SOC_MANUFACTURER + " " + Build.SOC_MODEL);
+            }
+            root.put("device", device);
+
+            JSONObject settings = new JSONObject();
+            settings.put("profile", prefs.latencyProfile);
+            settings.put("resolution", prefs.width + "x" + prefs.height);
+            settings.put("fps", prefs.fps);
+            settings.put("bitrate_kbps", prefs.bitrate);
+            settings.put("frame_pacing", prefs.framePacing);
+            settings.put("video_format_pref", String.valueOf(prefs.videoFormat));
+            settings.put("low_latency_mode_pref", prefs.lowLatencyMode);
+            settings.put("latency_guard_pref", prefs.latencyGuardMode);
+            settings.put("thread_priority_pref", prefs.threadPriorityLevel);
+            root.put("settings", settings);
+
+            JSONObject decoder = new JSONObject();
+            for (Map.Entry<String, String> e : renderer.getDecoderDiagnostics().entrySet()) {
+                decoder.put(e.getKey(), e.getValue());
+            }
+            root.put("decoder", decoder);
+
+            JSONObject stages = new JSONObject();
+            for (int i = 0; i < PipelineStats.STAGE_COUNT; i++) {
+                stages.put(PipelineStats.STAGE_KEYS[i], stageJson(snap.stages[i]));
+            }
+            root.put("stages_ms", stages);
+
+            JSONObject counters = new JSONObject();
+            counters.put("duration_s", round(snap.durationSec));
+            counters.put("frames_received", snap.counters.framesReceived);
+            counters.put("frames_lost_network", snap.counters.framesLostNetwork);
+            counters.put("loss_events", snap.counters.lossEvents);
+            counters.put("frames_decoded", snap.counters.framesDecoded);
+            counters.put("frames_rendered", snap.counters.framesRendered);
+            counters.put("frames_dropped_render", snap.counters.framesDroppedRender);
+            counters.put("frames_displayed_reported", snap.counters.framesDisplayed);
+            counters.put("resyncs", snap.counters.resyncs);
+            counters.put("received_fps", round(snap.fps(snap.counters.framesReceived)));
+            counters.put("rendered_fps", round(snap.fps(snap.counters.framesRendered)));
+            counters.put("network_loss_percent", round(snap.networkLossPercent()));
+            counters.put("render_drop_percent", round(snap.renderDropPercent()));
+            counters.put("jitter_ms", round(snap.jitterMs));
+            counters.put("bitrate_mbps", round(snap.bitrateMbps()));
+            root.put("counters", counters);
+
+            String baseName = "session-" + timestamp + "-" + prefs.latencyProfile;
+            File out = new File(getDirectory(context), baseName + ".json");
+            writeString(out, root.toString(2));
+
+            PipelineStats.FrameLog frameLog = stats.getFrameLog();
+            if (frameLog != null && frameLog.size() > 0) {
+                File csv = new File(getDirectory(context), baseName + "-frames.csv");
+                try (BufferedWriter w = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(csv), StandardCharsets.UTF_8))) {
+                    frameLog.writeCsv(w);
+                }
+            }
+
+            LimeLog.info("ULL session report saved: " + out.getAbsolutePath());
+            return out;
+        } catch (JSONException | IOException e) {
+            LimeLog.warning("Unable to save session report: " + e);
+            return null;
+        }
+    }
+
+    static void writeString(File file, String content) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    static String readString(File file) throws IOException {
+        try (InputStream in = new FileInputStream(file)) {
+            byte[] data = new byte[(int) file.length()];
+            int off = 0;
+            while (off < data.length) {
+                int r = in.read(data, off, data.length - off);
+                if (r < 0) {
+                    break;
+                }
+                off += r;
+            }
+            return new String(data, 0, off, StandardCharsets.UTF_8);
+        }
+    }
+
+    /** Session reports, newest first. */
+    public static List<File> list(Context context) {
+        File[] files = getDirectory(context).listFiles();
+        List<File> result = new ArrayList<>();
+        if (files == null) {
+            return result;
+        }
+        Arrays.sort(files, (a, b) -> b.getName().compareTo(a.getName()));
+        for (File f : files) {
+            if (f.getName().startsWith("session-") && f.getName().endsWith(".json")) {
+                result.add(f);
+            }
+        }
+        return result;
+    }
+
+    public static JSONObject load(File file) throws IOException, JSONException {
+        return new JSONObject(readString(file));
+    }
+
+    public static String describe(JSONObject report) {
+        JSONObject settings = report.optJSONObject("settings");
+        JSONObject decoder = report.optJSONObject("decoder");
+        StringBuilder sb = new StringBuilder();
+        sb.append(report.optString("timestamp")).append("  [").append(settings != null ? settings.optString("profile") : "?").append("]  ");
+        if (settings != null) {
+            sb.append(settings.optString("resolution")).append('@').append(settings.optInt("fps"))
+                    .append(' ').append(settings.optInt("bitrate_kbps") / 1000.0).append(" Mbps");
+        }
+        if (decoder != null) {
+            sb.append("  ").append(decoder.optString("decoder"));
+        }
+        return sb.toString();
+    }
+
+    // Metrics shown in reports and comparisons: label resource, JSON path, lower-is-better
+    private static final Object[][] METRICS = {
+            {R.string.ull_metric_received_fps, "counters/received_fps", false},
+            {R.string.ull_metric_rendered_fps, "counters/rendered_fps", false},
+            {R.string.ull_metric_network_loss, "counters/network_loss_percent", true},
+            {R.string.ull_metric_render_drops, "counters/render_drop_percent", true},
+            {R.string.ull_metric_jitter, "counters/jitter_ms", true},
+            {R.string.ull_metric_queue_delay_p95, "stages_ms/queue_delay/p95_ms", true},
+            {R.string.ull_metric_receive, "stages_ms/receive/mean_ms", true},
+            {R.string.ull_metric_submit, "stages_ms/submit/mean_ms", true},
+            {R.string.ull_metric_decode, "stages_ms/decode/mean_ms", true},
+            {R.string.ull_metric_decode_p95, "stages_ms/decode/p95_ms", true},
+            {R.string.ull_metric_pacing, "stages_ms/pacing/mean_ms", true},
+            {R.string.ull_metric_display, "stages_ms/display/mean_ms", true},
+            {R.string.ull_metric_client, "stages_ms/client/mean_ms", true},
+            {R.string.ull_metric_client_p95, "stages_ms/client/p95_ms", true},
+            {R.string.ull_metric_client_display, "stages_ms/client_display/mean_ms", true},
+            {R.string.ull_metric_host, "stages_ms/host/mean_ms", true},
+            {R.string.ull_metric_resyncs, "counters/resyncs", true},
+    };
+
+    private static Double lookup(JSONObject root, String path) {
+        String[] parts = path.split("/");
+        JSONObject cur = root;
+        for (int i = 0; i < parts.length - 1; i++) {
+            cur = cur.optJSONObject(parts[i]);
+            if (cur == null) {
+                return null;
+            }
+        }
+        String last = parts[parts.length - 1];
+        if (!cur.has(last)) {
+            return null;
+        }
+        // Stages with no samples (e.g. display time not reported) are not comparable
+        if (parts.length == 3 && cur.optLong("count", 0) == 0) {
+            return null;
+        }
+        return cur.optDouble(last);
+    }
+
+    private static String fmt(Double v) {
+        return v == null ? "n/a" : String.format(Locale.ROOT, "%.2f", v);
+    }
+
+    public static String toReadableText(Context context, JSONObject report) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(describe(report)).append("\n\n");
+        for (Object[] m : METRICS) {
+            sb.append(String.format(Locale.ROOT, "%-34s %10s%n",
+                    context.getString((Integer) m[0]), fmt(lookup(report, (String) m[1]))));
+        }
+        JSONObject decoder = report.optJSONObject("decoder");
+        if (decoder != null) {
+            sb.append('\n');
+            Iterator<String> keys = decoder.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                sb.append(k).append(": ").append(decoder.optString(k)).append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Side-by-side comparison of two sessions (B relative to A). */
+    public static String compare(Context context, JSONObject a, JSONObject b) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("A: ").append(describe(a)).append('\n');
+        sb.append("B: ").append(describe(b)).append("\n\n");
+        sb.append(String.format(Locale.ROOT, "%-34s %9s %9s %9s%n", "", "A", "B", "B-A"));
+        for (Object[] m : METRICS) {
+            Double va = lookup(a, (String) m[1]);
+            Double vb = lookup(b, (String) m[1]);
+            String delta = "n/a";
+            if (va != null && vb != null) {
+                double d = vb - va;
+                boolean lowerIsBetter = (Boolean) m[2];
+                boolean better = lowerIsBetter ? d < 0 : d > 0;
+                delta = String.format(Locale.ROOT, "%+.2f%s", d, Math.abs(d) < 0.005 ? "" : (better ? " +" : " -"));
+            }
+            sb.append(String.format(Locale.ROOT, "%-34s %9s %9s %9s%n",
+                    context.getString((Integer) m[0]), fmt(va), fmt(vb), delta));
+        }
+        sb.append('\n').append(context.getString(R.string.ull_compare_legend));
+        return sb.toString();
+    }
+}

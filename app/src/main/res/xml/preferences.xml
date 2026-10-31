@@ -2,6 +2,80 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:seekbar="http://schemas.moonlight-stream.com/apk/res/seekbar">
 
+    <!-- ULL: profile, diagnostics and advanced latency settings -->
+    <PreferenceCategory android:title="@string/category_ull"
+        android:key="category_ull">
+        <ListPreference
+            android:key="ull_profile"
+            android:title="@string/title_ull_profile"
+            android:summary="%s"
+            android:entries="@array/ull_profile_names"
+            android:entryValues="@array/ull_profile_values"
+            android:defaultValue="ull" />
+        <Preference
+            android:key="ull_open_diagnostics"
+            android:title="@string/title_ull_diagnostics"
+            android:summary="@string/summary_ull_diagnostics" />
+        <PreferenceScreen
+            android:key="ull_advanced_screen"
+            android:title="@string/title_ull_advanced"
+            android:summary="@string/summary_ull_advanced">
+            <ListPreference
+                android:key="ull_avc_decoder"
+                android:title="@string/title_ull_avc_decoder"
+                android:summary="%s"
+                android:entries="@array/ull_ll_mode_names"
+                android:entryValues="@array/ull_ll_mode_values"
+                android:defaultValue="auto" />
+            <ListPreference
+                android:key="ull_low_latency_mode"
+                android:title="@string/title_ull_ll_mode"
+                android:summary="%s"
+                android:entries="@array/ull_ll_mode_names"
+                android:entryValues="@array/ull_ll_mode_values"
+                android:defaultValue="auto" />
+            <ListPreference
+                android:key="ull_latency_guard"
+                android:title="@string/title_ull_latency_guard"
+                android:summary="@string/summary_ull_latency_guard"
+                android:entries="@array/ull_guard_names"
+                android:entryValues="@array/ull_guard_values"
+                android:defaultValue="aggressive" />
+            <ListPreference
+                android:key="ull_thread_priority"
+                android:title="@string/title_ull_thread_priority"
+                android:summary="@string/summary_ull_thread_priority"
+                android:entries="@array/ull_priority_names"
+                android:entryValues="@array/ull_priority_values"
+                android:defaultValue="high" />
+            <Preference
+                android:key="ull_renderer_info"
+                android:title="@string/title_ull_renderer"
+                android:summary="@string/summary_ull_renderer"
+                android:selectable="false" />
+            <CheckBoxPreference
+                android:key="ull_detailed_overlay"
+                android:title="@string/title_ull_detailed_overlay"
+                android:summary="@string/summary_ull_detailed_overlay"
+                android:defaultValue="true" />
+            <CheckBoxPreference
+                android:key="ull_record_sessions"
+                android:title="@string/title_ull_record_sessions"
+                android:summary="@string/summary_ull_record_sessions"
+                android:defaultValue="true" />
+            <CheckBoxPreference
+                android:key="ull_frame_log"
+                android:dependency="ull_record_sessions"
+                android:title="@string/title_ull_frame_log"
+                android:summary="@string/summary_ull_frame_log"
+                android:defaultValue="false" />
+        </PreferenceScreen>
+        <Preference
+            android:key="ull_restore_defaults"
+            android:title="@string/title_ull_restore_defaults"
+            android:summary="@string/summary_ull_restore_defaults" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/category_basic_settings"
         android:key="category_basic_settings">
         <ListPreference

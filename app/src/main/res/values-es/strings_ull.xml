@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Moonlight ULL (Ultra Low Latency) - español -->
+<resources>
+    <!-- Ajustes -->
+    <string name="category_ull">Ultra Low Latency</string>
+    <string name="title_ull_profile">Perfil de rendimiento</string>
+    <string name="title_ull_diagnostics">Diagnóstico y benchmark</string>
+    <string name="summary_ull_diagnostics">Capacidades del dispositivo, benchmark del decodificador en el propio equipo, sesiones registradas y comparación A/B</string>
+    <string name="title_ull_advanced">Ajustes avanzados de latencia</string>
+    <string name="summary_ull_advanced">Decodificador, modo de baja latencia, buffering, prioridad de procesamiento y estadísticas. Resolución, FPS, bitrate y sincronización de presentación (frame pacing) están en Ajustes básicos.</string>
+    <string name="title_ull_avc_decoder">Decodificador H.264</string>
+    <string name="ull_decoder_auto">Automático (selección de Moonlight)</string>
+    <string name="title_ull_ll_mode">Modo de baja latencia del decodificador</string>
+    <string name="title_ull_latency_guard">Protección contra acumulación de latencia</string>
+    <string name="summary_ull_latency_guard">%s\nResincroniza (IDR) solo cuando el decodificador no da abasto y se acumulan fotogramas. El retardo puramente de red nunca dispara una acción.</string>
+    <string name="title_ull_thread_priority">Prioridad de procesamiento</string>
+    <string name="summary_ull_thread_priority">%s\nPrioridad de los hilos de recepción, envío al decodificador y render de vídeo.</string>
+    <string name="title_ull_renderer">Renderizador</string>
+    <string name="summary_ull_renderer">Salida directa a SurfaceView: el decodificador escribe en la superficie de pantalla (overlay de hardware, sin copias ni conversión de color). OpenGL ES, Vulkan y TextureView añadirían una pasada de GPU y al menos un fotograma de latencia, por eso no se ofrecen.</string>
+    <string name="title_ull_detailed_overlay">Estadísticas detalladas en pantalla</string>
+    <string name="summary_ull_detailed_overlay">Desglose de latencia por etapa (media / p95) cuando la superposición de rendimiento está activada</string>
+    <string name="title_ull_record_sessions">Registrar informes de sesión</string>
+    <string name="summary_ull_record_sessions">Guarda un informe de latencia por etapas tras cada transmisión para comparar configuraciones</string>
+    <string name="title_ull_frame_log">Registro CSV por fotograma</string>
+    <string name="summary_ull_frame_log">Guarda también los tiempos de cada fotograma (hasta 10 minutos por sesión)</string>
+    <string name="title_ull_restore_defaults">Restaurar valores predeterminados</string>
+    <string name="summary_ull_restore_defaults">Vuelve a aplicar el perfil Ultra Low Latency y restablece los ajustes avanzados de latencia</string>
+    <string name="ull_restore_confirm">¿Restaurar los ajustes de latencia predeterminados? No se modifican los ajustes de mando, entrada ni interfaz.</string>
+    <string name="ull_restored">Ajustes de latencia predeterminados restaurados</string>
+    <string name="ull_vendor_mode_warning">Todas las claves de proveedor: algunos decodificadores pueden rechazar esta configuración. Moonlight vuelve automáticamente a una segura; ejecuta el benchmark del decodificador para comprobar si de verdad mejora en este equipo.</string>
+
+    <!-- Superposición de rendimiento (media / p95 del último segundo) -->
+    <string name="ull_overlay_header">ULL (media / p95) · modo LL del decodificador: %1$s (%2$s)</string>
+    <string name="ull_overlay_network">Red: recepción del fotograma %1$s · jitter %2$.2f ms · retardo de cola %3$s · %4$.1f Mbps</string>
+    <string name="ull_overlay_submit">Hasta el decodificador: %1$s (espera de buffer de entrada %2$s)</string>
+    <string name="ull_overlay_decode">Decodificación: %1$s · fotogramas dentro del decodificador: %2$d</string>
+    <string name="ull_overlay_present">Espera hasta liberar: %1$s · presentación (sistema) %2$s · reemplazados %3$.1f%%</string>
+    <string name="ull_overlay_client">Cliente 1er paquete → liberación: %1$s · → pantalla: %2$s</string>
+    <string name="ull_overlay_cpu">CPU (de un núcleo): proceso %1$s · VideoRecv %2$s</string>
+    <string name="ull_overlay_guard">Resincronizaciones de la protección de latencia: %1$d</string>
+    <string name="ull_overlay_decoder_saturated">AVISO: el decodificador no sostiene esta transmisión. Baja FPS, resolución o bitrate.</string>
+    <string name="ull_overlay_network_congested">AVISO: cola de red sostenida. Baja el bitrate o revisa la red.</string>
+
+    <!-- Diagnóstico -->
+    <string name="ull_diagnostics_title">Diagnóstico Moonlight ULL</string>
+    <string name="ull_diag_capabilities">Informe de capacidades del dispositivo</string>
+    <string name="ull_diag_bench_h264">Benchmark del decodificador (H.264 1080p60)</string>
+    <string name="ull_diag_bench_hevc">Benchmark del decodificador (HEVC 1080p60)</string>
+    <string name="ull_diag_sessions">Sesiones registradas</string>
+    <string name="ull_diag_compare">Comparar dos sesiones (A/B)</string>
+    <string name="ull_diag_clear_tuning">Borrar resultados del benchmark</string>
+    <string name="ull_diag_intro">Los informes se guardan en:\n%1$s\n\n1. Ejecuta el informe de capacidades (envíalo si el equipo necesita análisis).\n2. Ejecuta el benchmark H.264: mide cada configuración de baja latencia de MediaCodec en este equipo y el modo \"Auto\" usará la más rápida que funcione.\n3. Transmite con distintos perfiles y compara las sesiones registradas.</string>
+    <string name="ull_diag_working">Procesando…</string>
+    <string name="ull_diag_saved_to">Guardado en %1$s</string>
+    <string name="ull_diag_no_sessions">Aún no hay sesiones registradas. Activa \"Registrar informes de sesión\" y transmite al menos unos segundos.</string>
+    <string name="ull_diag_need_two_sessions">Se necesitan al menos dos sesiones registradas.</string>
+    <string name="ull_diag_pick_a">Sesión A (referencia)</string>
+    <string name="ull_diag_pick_b">Sesión B</string>
+    <string name="ull_diag_tuning_cleared">Resultados del benchmark borrados. \"Auto\" usará la heurística de Moonlight hasta que se vuelva a ejecutar el benchmark.</string>
+    <string name="ull_close">Cerrar</string>
+    <string name="ull_bench_starting">Preparando el benchmark del decodificador…</string>
+    <string name="ull_bench_running">Benchmark del decodificador %1$s — vigila el contador de fotogramas: debe avanzar con fluidez</string>
+    <string name="ull_compare_legend">B-A es la diferencia. \"+\" significa que B es mejor, \"-\" que B es peor. n/a: no medido en alguna de las sesiones.</string>
+
+    <!-- Métricas de los informes -->
+    <string name="ull_metric_received_fps">FPS recibidos</string>
+    <string name="ull_metric_rendered_fps">FPS renderizados</string>
+    <string name="ull_metric_network_loss">Fotogramas perdidos en red (%)</string>
+    <string name="ull_metric_render_drops">Reemplazados antes de mostrarse (%)</string>
+    <string name="ull_metric_jitter">Jitter de red RFC3550 (ms)</string>
+    <string name="ull_metric_queue_delay_p95">Retardo de cola p95 (ms, est.)</string>
+    <string name="ull_metric_receive">Tiempo de recepción (ms)</string>
+    <string name="ull_metric_submit">Reensamblado → decodificador (ms)</string>
+    <string name="ull_metric_decode">Decodificación media (ms)</string>
+    <string name="ull_metric_decode_p95">Decodificación p95 (ms)</string>
+    <string name="ull_metric_pacing">Decodificado → liberado (ms)</string>
+    <string name="ull_metric_display">Liberado → pantalla, sistema (ms)</string>
+    <string name="ull_metric_client">1er paquete → liberado (ms)</string>
+    <string name="ull_metric_client_p95">1er paquete → liberado p95 (ms)</string>
+    <string name="ull_metric_client_display">1er paquete → pantalla (ms)</string>
+    <string name="ull_metric_host">Procesamiento en host (ms, Sunshine)</string>
+    <string name="ull_metric_resyncs">Resincronizaciones de protección</string>
+</resources>

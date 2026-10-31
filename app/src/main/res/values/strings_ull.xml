@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Moonlight ULL (Ultra Low Latency) strings -->
+<resources>
+    <!-- Settings -->
+    <string name="category_ull">Ultra Low Latency</string>
+    <string name="title_ull_profile">Performance profile</string>
+    <string name="title_ull_diagnostics">Diagnostics and benchmark</string>
+    <string name="summary_ull_diagnostics">Device capabilities, on-device decoder benchmark, recorded sessions and A/B comparison</string>
+    <string name="title_ull_advanced">Advanced latency settings</string>
+    <string name="summary_ull_advanced">Decoder, low latency mode, buffering, processing priority and statistics. Resolution, FPS, bitrate and presentation sync (frame pacing) are in Basic Settings.</string>
+    <string name="title_ull_avc_decoder">H.264 decoder</string>
+    <string name="ull_decoder_auto">Automatic (Moonlight selection)</string>
+    <string name="title_ull_ll_mode">Decoder low latency mode</string>
+    <string name="title_ull_latency_guard">Latency accumulation guard</string>
+    <string name="summary_ull_latency_guard">%s\nResyncs (IDR) only when the decoder can\'t keep up and frames pile up. Network-only delay is never acted upon.</string>
+    <string name="title_ull_thread_priority">Processing priority</string>
+    <string name="summary_ull_thread_priority">%s\nPriority of the video receive, submit and render threads.</string>
+    <string name="title_ull_renderer">Renderer</string>
+    <string name="summary_ull_renderer">Direct SurfaceView output: the decoder writes into the display surface (hardware overlay, no copies, no color conversion). OpenGL ES, Vulkan and TextureView would add a GPU pass and at least one frame of latency, so they are not offered.</string>
+    <string name="title_ull_detailed_overlay">Detailed statistics overlay</string>
+    <string name="summary_ull_detailed_overlay">Per-stage latency breakdown (mean / p95) when the performance overlay is enabled</string>
+    <string name="title_ull_record_sessions">Record session reports</string>
+    <string name="summary_ull_record_sessions">Save a per-stage latency report after every stream so configurations can be compared</string>
+    <string name="title_ull_frame_log">Per-frame CSV log</string>
+    <string name="summary_ull_frame_log">Also save the timings of every frame (up to 10 minutes per session)</string>
+    <string name="title_ull_restore_defaults">Restore default values</string>
+    <string name="summary_ull_restore_defaults">Re-applies the Ultra Low Latency profile and resets the advanced latency settings</string>
+    <string name="ull_restore_confirm">Restore the default latency settings? Gamepad, input and UI settings are not changed.</string>
+    <string name="ull_restored">Default latency settings restored</string>
+    <string name="ull_vendor_mode_warning">All vendor keys: some decoders may reject this configuration. Moonlight then falls back automatically; run the decoder benchmark to verify it actually helps on this device.</string>
+
+    <!-- Performance overlay (values are mean / p95 over the last second) -->
+    <string name="ull_overlay_header">ULL (mean / p95) · decoder LL mode: %1$s (%2$s)</string>
+    <string name="ull_overlay_network">Network: frame receive %1$s · jitter %2$.2f ms · queue delay %3$s · %4$.1f Mbps</string>
+    <string name="ull_overlay_submit">To decoder: %1$s (input buffer wait %2$s)</string>
+    <string name="ull_overlay_decode">Decode: %1$s · frames inside decoder: %2$d</string>
+    <string name="ull_overlay_present">Release wait: %1$s · display (system) %2$s · replaced %3$.1f%%</string>
+    <string name="ull_overlay_client">Client 1st packet → release: %1$s · → display: %2$s</string>
+    <string name="ull_overlay_cpu">CPU (of one core): process %1$s · VideoRecv %2$s</string>
+    <string name="ull_overlay_guard">Latency guard resyncs: %1$d</string>
+    <string name="ull_overlay_decoder_saturated">WARNING: the decoder can\'t sustain this stream. Lower FPS, resolution or bitrate.</string>
+    <string name="ull_overlay_network_congested">WARNING: sustained network queueing. Lower the bitrate or check the network.</string>
+
+    <!-- Diagnostics -->
+    <string name="ull_diagnostics_title">Moonlight ULL diagnostics</string>
+    <string name="ull_diag_capabilities">Device capability report</string>
+    <string name="ull_diag_bench_h264">Decoder benchmark (H.264 1080p60)</string>
+    <string name="ull_diag_bench_hevc">Decoder benchmark (HEVC 1080p60)</string>
+    <string name="ull_diag_sessions">Recorded sessions</string>
+    <string name="ull_diag_compare">Compare two sessions (A/B)</string>
+    <string name="ull_diag_clear_tuning">Clear decoder benchmark results</string>
+    <string name="ull_diag_intro">Reports are saved in:\n%1$s\n\n1. Run the device capability report (send it if the device needs analysis).\n2. Run the H.264 decoder benchmark: it measures every MediaCodec low latency configuration on this device and the \"Auto\" mode will use the fastest one that works.\n3. Stream with different profiles and compare the recorded sessions.</string>
+    <string name="ull_diag_working">Working…</string>
+    <string name="ull_diag_saved_to">Saved to %1$s</string>
+    <string name="ull_diag_no_sessions">No sessions recorded yet. Enable \"Record session reports\" and stream for at least a few seconds.</string>
+    <string name="ull_diag_need_two_sessions">At least two recorded sessions are needed.</string>
+    <string name="ull_diag_pick_a">Session A (reference)</string>
+    <string name="ull_diag_pick_b">Session B</string>
+    <string name="ull_diag_tuning_cleared">Decoder benchmark results cleared. \"Auto\" will use Moonlight\'s heuristics until the benchmark is run again.</string>
+    <string name="ull_close">Close</string>
+    <string name="ull_bench_starting">Preparing decoder benchmark…</string>
+    <string name="ull_bench_running">Decoder benchmark %1$s — watch the frame counter: it must move smoothly</string>
+    <string name="ull_compare_legend">B-A is the difference. \"+\" means B is better, \"-\" means B is worse. n/a: not measured in one of the sessions.</string>
+
+    <!-- Session report metrics -->
+    <string name="ull_metric_received_fps">Received FPS</string>
+    <string name="ull_metric_rendered_fps">Rendered FPS</string>
+    <string name="ull_metric_network_loss">Frames lost by network (%)</string>
+    <string name="ull_metric_render_drops">Replaced before display (%)</string>
+    <string name="ull_metric_jitter">Network jitter RFC3550 (ms)</string>
+    <string name="ull_metric_queue_delay_p95">Queue delay p95 (ms, est.)</string>
+    <string name="ull_metric_receive">Frame receive time (ms)</string>
+    <string name="ull_metric_submit">Reassembled → decoder (ms)</string>
+    <string name="ull_metric_decode">Decode mean (ms)</string>
+    <string name="ull_metric_decode_p95">Decode p95 (ms)</string>
+    <string name="ull_metric_pacing">Decoded → release (ms)</string>
+    <string name="ull_metric_display">Release → display, system (ms)</string>
+    <string name="ull_metric_client">1st packet → release (ms)</string>
+    <string name="ull_metric_client_p95">1st packet → release p95 (ms)</string>
+    <string name="ull_metric_client_display">1st packet → display (ms)</string>
+    <string name="ull_metric_host">Host processing (ms, Sunshine)</string>
+    <string name="ull_metric_resyncs">Latency guard resyncs</string>
+</resources>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="ull_profile_names">
+        <item>Ultra Low Latency (recommended)</item>
+        <item>Balanced</item>
+        <item>Maximum quality</item>
+        <item>Original Moonlight (A/B reference)</item>
+        <item>Custom</item>
+    </string-array>
+    <string-array name="ull_profile_values" translatable="false">
+        <item>ull</item>
+        <item>balanced</item>
+        <item>quality</item>
+        <item>original</item>
+        <item>custom</item>
+    </string-array>
+
+    <string-array name="ull_ll_mode_names">
+        <item>Auto (benchmark result, else Moonlight heuristics)</item>
+        <item>Original Moonlight heuristics</item>
+        <item>Android standard (KEY_LOW_LATENCY + priority)</item>
+        <item>All vendor keys (advanced)</item>
+        <item>Off (no low latency keys)</item>
+    </string-array>
+    <string-array name="ull_ll_mode_values" translatable="false">
+        <item>auto</item>
+        <item>original</item>
+        <item>standard</item>
+        <item>vendor</item>
+        <item>off</item>
+    </string-array>
+
+    <string-array name="ull_guard_names">
+        <item>Off (original behavior)</item>
+        <item>Normal</item>
+        <item>Aggressive (recommended)</item>
+    </string-array>
+    <string-array name="ull_guard_values" translatable="false">
+        <item>off</item>
+        <item>normal</item>
+        <item>aggressive</item>
+    </string-array>
+
+    <string-array name="ull_priority_names">
+        <item>Normal (original behavior)</item>
+        <item>High (recommended)</item>
+        <item>Maximum</item>
+    </string-array>
+    <string-array name="ull_priority_values" translatable="false">
+        <item>normal</item>
+        <item>high</item>
+        <item>max</item>
+    </string-array>
+</resources>

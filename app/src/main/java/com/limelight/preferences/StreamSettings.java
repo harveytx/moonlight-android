@@ -9,6 +9,8 @@ import android.media.MediaCodecInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.Handler;
 import android.os.Vibrator;
 import android.preference.CheckBoxPreference;
@@ -26,16 +28,20 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.widget.Toast;
 
 import com.limelight.LimeLog;
 import com.limelight.PcView;
 import com.limelight.R;
 import com.limelight.binding.video.MediaCodecHelper;
+import com.limelight.diagnostics.DiagnosticsActivity;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.UiHelper;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class StreamSettings extends Activity {
     private PreferenceConfiguration previousPrefs;
@@ -121,9 +127,161 @@ public class StreamSettings extends Activity {
         }
     }
 
-    public static class SettingsFragment extends PreferenceFragment {
+    public static class SettingsFragment extends PreferenceFragment
+            implements SharedPreferences.OnSharedPreferenceChangeListener {
         private int nativeResolutionStartIndex = Integer.MAX_VALUE;
         private boolean nativeFramerateShown = false;
+        private boolean applyingProfile = false;
+
+        private void scheduleReload() {
+            // Let the current preference change complete before rebuilding the screen
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    StreamSettings settingsActivity = (StreamSettings) SettingsFragment.this.getActivity();
+                    if (settingsActivity != null) {
+                        settingsActivity.reloadSettings();
+                    }
+                }
+            }, 300);
+        }
+
+        // ULL: profile selection, diagnostics, decoder list and restore defaults
+        private void setupUllPreferences() {
+            final Activity activity = getActivity();
+
+            findPreference(LatencyProfile.PREF_KEY).setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    String profile = (String) newValue;
+                    if (LatencyProfile.isKnownProfile(profile)) {
+                        applyingProfile = true;
+                        LatencyProfile.apply(activity, profile);
+                        applyingProfile = false;
+                        scheduleReload();
+                    }
+                    return true;
+                }
+            });
+
+            findPreference("ull_open_diagnostics").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    startActivity(new Intent(activity, DiagnosticsActivity.class));
+                    return true;
+                }
+            });
+
+            findPreference("ull_restore_defaults").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    new AlertDialog.Builder(activity)
+                            .setTitle(R.string.title_ull_restore_defaults)
+                            .setMessage(R.string.ull_restore_confirm)
+                            .setPositiveButton(R.string.yes, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    applyingProfile = true;
+                                    LatencyProfile.restoreDefaults(activity);
+                                    applyingProfile = false;
+                                    Toast.makeText(activity, R.string.ull_restored, Toast.LENGTH_SHORT).show();
+                                    scheduleReload();
+                                }
+                            })
+                            .setNegativeButton(R.string.no, null)
+                            .show();
+                    return true;
+                }
+            });
+
+            findPreference(LatencyProfile.LOW_LATENCY_MODE_KEY).setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    if ("vendor".equals(newValue)) {
+                        Dialog.displayDialog(activity, getString(R.string.title_ull_ll_mode),
+                                getString(R.string.ull_vendor_mode_warning), false);
+                    }
+                    return true;
+                }
+            });
+
+            // Only hardware H.264 decoders that Moonlight would accept are offered
+            ListPreference decoderPref = (ListPreference) findPreference(PreferenceConfiguration.ULL_AVC_DECODER_PREF_STRING);
+            List<CharSequence> names = new ArrayList<>();
+            List<CharSequence> values = new ArrayList<>();
+            names.add(getString(R.string.ull_decoder_auto));
+            values.add(PreferenceConfiguration.DECODER_AUTO);
+            try {
+                MediaCodecHelper.initialize(activity, GlPreferences.readPreferences(activity).glRenderer);
+                for (MediaCodecInfo info : MediaCodecHelper.getHardwareDecodersForMime("video/avc")) {
+                    String label = info.getName();
+                    if (MediaCodecHelper.decoderAdvertisesLowLatency(info, "video/avc")) {
+                        label += " (FEATURE_LowLatency)";
+                    }
+                    names.add(label);
+                    values.add(info.getName());
+                }
+            } catch (Exception e) {
+                LimeLog.warning("Unable to enumerate H.264 decoders: " + e);
+            }
+            decoderPref.setEntries(names.toArray(new CharSequence[0]));
+            decoderPref.setEntryValues(values.toArray(new CharSequence[0]));
+            if (!values.contains(decoderPref.getValue())) {
+                // The previously selected decoder disappeared (firmware update?)
+                decoderPref.setValue(PreferenceConfiguration.DECODER_AUTO);
+            }
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            getPreferenceScreen().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+        }
+
+        @Override
+        public void onPause() {
+            getPreferenceScreen().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
+            super.onPause();
+        }
+
+        @Override
+        public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+            if (applyingProfile || key == null || getActivity() == null) {
+                return;
+            }
+            boolean managed = false;
+            for (String k : LatencyProfile.MANAGED_KEYS) {
+                if (k.equals(key)) {
+                    managed = true;
+                    break;
+                }
+            }
+            if (!managed) {
+                return;
+            }
+
+            // A latency setting was changed by hand, so the profile may no longer describe the
+            // settings. Check after the current preference change has been fully persisted:
+            // a resolution/FPS change writes the bitrate before its own value is saved.
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    Activity activity = getActivity();
+                    if (activity == null) {
+                        return;
+                    }
+                    String profile = LatencyProfile.getCurrentProfile(activity);
+                    if (LatencyProfile.isKnownProfile(profile) && !LatencyProfile.matches(activity, profile)) {
+                        PreferenceManager.getDefaultSharedPreferences(activity).edit()
+                                .putString(LatencyProfile.PREF_KEY, LatencyProfile.CUSTOM).apply();
+                        ListPreference profilePref = (ListPreference) findPreference(LatencyProfile.PREF_KEY);
+                        if (profilePref != null) {
+                            profilePref.setValue(LatencyProfile.CUSTOM);
+                        }
+                    }
+                }
+            });
+        }
 
         private void setValue(String preferenceKey, String value) {
             ListPreference pref = (ListPreference) findPreference(preferenceKey);
@@ -257,9 +415,10 @@ public class StreamSettings extends Activity {
                 fps = prefs.getString(PreferenceConfiguration.FPS_PREF_STRING, PreferenceConfiguration.DEFAULT_FPS);
             }
 
+            // ULL: keep the active profile's bitrate scaling when resolution or FPS change
             prefs.edit()
                     .putInt(PreferenceConfiguration.BITRATE_PREF_STRING,
-                            PreferenceConfiguration.getDefaultBitrate(res, fps))
+                            LatencyProfile.computeBitrate(LatencyProfile.getCurrentProfile(getActivity()), res, fps))
                     .apply();
         }
 
@@ -276,6 +435,8 @@ public class StreamSettings extends Activity {
 
             addPreferencesFromResource(R.xml.preferences);
             PreferenceScreen screen = getPreferenceScreen();
+
+            setupUllPreferences();
 
             // hide on-screen controls category on non touch screen devices
             if (!getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {

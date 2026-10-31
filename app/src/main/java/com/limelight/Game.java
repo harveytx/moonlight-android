@@ -15,6 +15,7 @@ import com.limelight.binding.input.touch.TouchContext;
 import com.limelight.binding.input.virtual_controller.VirtualController;
 import com.limelight.binding.video.CrashListener;
 import com.limelight.binding.video.MediaCodecDecoderRenderer;
+import com.limelight.diagnostics.SessionReport;
 import com.limelight.binding.video.MediaCodecHelper;
 import com.limelight.binding.video.PerfOverlayListener;
 import com.limelight.nvstream.NvConnection;
@@ -35,6 +36,7 @@ import com.limelight.utils.Dialog;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.SpinnerDialog;
+import com.limelight.utils.StreamThreadPriority;
 import com.limelight.utils.UiHelper;
 
 import android.annotation.SuppressLint;
@@ -2240,9 +2242,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // thread to keep things smooth for the UI. Inside moonlight-common,
             // we prevent another thread from starting a connection before and
             // during the process of stopping this one.
+            final MediaCodecDecoderRenderer renderer = decoderRenderer;
+            final PreferenceConfiguration sessionPrefs = prefConfig;
             new Thread() {
                 public void run() {
                     conn.stop();
+
+                    // ULL: the decoder is stopped now, so the session statistics are final
+                    if (sessionPrefs.recordSessions && renderer != null) {
+                        SessionReport.save(Game.this, renderer, sessionPrefs, pcName, appName);
+                    }
                 }
             }.start();
         }
@@ -2403,6 +2412,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void connectionStarted() {
+        // ULL: the native video threads exist now, so raise their priority if requested
+        decoderRenderer.setNativeThreadPriorityInfo(
+                StreamThreadPriority.applyToNativeVideoThreads(prefConfig.threadPriorityLevel));
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {

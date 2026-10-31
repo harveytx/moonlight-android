@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ULL diagnostics: actions on the left, scrollable output on the right (D-pad friendly) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="24dp">
+
+    <ScrollView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="12dp"
+                android:text="@string/ull_diagnostics_title"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/ull_btn_capabilities"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_capabilities" />
+
+            <Button
+                android:id="@+id/ull_btn_bench_h264"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_bench_h264" />
+
+            <Button
+                android:id="@+id/ull_btn_bench_hevc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_bench_hevc" />
+
+            <Button
+                android:id="@+id/ull_btn_sessions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_sessions" />
+
+            <Button
+                android:id="@+id/ull_btn_compare"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_compare" />
+
+            <Button
+                android:id="@+id/ull_btn_clear_tuning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ull_diag_clear_tuning" />
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/ull_output_scroll"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="24dp"
+        android:layout_weight="2"
+        android:focusable="true"
+        android:background="#20FFFFFF"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/ull_output"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="false"
+            android:textSize="12sp" />
+    </ScrollView>
+</LinearLayout>

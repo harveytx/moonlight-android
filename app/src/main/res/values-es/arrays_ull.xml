@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="ull_profile_names">
+        <item>Ultra Low Latency (recomendado)</item>
+        <item>Equilibrado</item>
+        <item>Máxima calidad</item>
+        <item>Moonlight original (referencia A/B)</item>
+        <item>Personalizado</item>
+    </string-array>
+
+    <string-array name="ull_ll_mode_names">
+        <item>Auto (resultado del benchmark o heurística de Moonlight)</item>
+        <item>Heurística original de Moonlight</item>
+        <item>Estándar de Android (KEY_LOW_LATENCY + prioridad)</item>
+        <item>Todas las claves de proveedor (avanzado)</item>
+        <item>Desactivado (sin claves de baja latencia)</item>
+    </string-array>
+
+    <string-array name="ull_guard_names">
+        <item>Desactivada (comportamiento original)</item>
+        <item>Normal</item>
+        <item>Agresiva (recomendado)</item>
+    </string-array>
+
+    <string-array name="ull_priority_names">
+        <item>Normal (comportamiento original)</item>
+        <item>Alta (recomendado)</item>
+        <item>Máxima</item>
+    </string-array>
+</resources>

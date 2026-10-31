@@ -48,6 +48,14 @@ public class MediaCodecHelper {
     public static final boolean SHOULD_BYPASS_SOFTWARE_BLOCK =
             Build.HARDWARE.equals("ranchu") || Build.HARDWARE.equals("cheets") || Build.BRAND.equals("Android-x86");
 
+    // ULL: strategies for MediaCodec low latency configuration. See setDecoderLowLatencyOptions().
+    public static final int LOW_LATENCY_MODE_AUTO = 0;          // Resolved by the renderer (benchmark result, known quirks)
+    public static final int LOW_LATENCY_MODE_ORIGINAL = 1;      // Moonlight's original per-vendor heuristics
+    public static final int LOW_LATENCY_MODE_STANDARD = 2;      // KEY_LOW_LATENCY + KEY_PRIORITY only
+    public static final int LOW_LATENCY_MODE_VENDOR = 3;        // Every applicable standard and vendor key at once
+    public static final int LOW_LATENCY_MODE_OFF = 4;           // No low latency keys at all
+    public static final int LOW_LATENCY_MODE_PRIORITY_ONLY = 5; // Internal: KEY_PRIORITY only (Amlogic HEVC quirk)
+
     private static boolean isLowEndSnapdragon = false;
     private static boolean isAdreno620 = false;
     private static boolean initialized = false;
@@ -592,6 +600,216 @@ public class MediaCodecHelper {
         }
 
         return setNewOption;
+    }
+
+    /**
+     * ULL: Applies a low latency configuration strategy to the format for the given try.
+     * Same contract as {@link #setDecoderLowLatencyOptions(MediaFormat, MediaCodecInfo, int)}:
+     * returns false once there are no more options to try, in which case the caller performs
+     * its final attempt with the bare format.
+     */
+    public static boolean setDecoderLowLatencyOptions(MediaFormat videoFormat, MediaCodecInfo decoderInfo, int tryNumber, int mode) {
+        switch (mode) {
+            case LOW_LATENCY_MODE_OFF:
+                return false;
+
+            case LOW_LATENCY_MODE_PRIORITY_ONLY:
+                if (tryNumber < 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    videoFormat.setInteger(MediaFormat.KEY_PRIORITY, 0);
+                    return true;
+                }
+                return false;
+
+            case LOW_LATENCY_MODE_STANDARD:
+                if (tryNumber < 1) {
+                    videoFormat.setInteger("low-latency", 1);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        videoFormat.setInteger(MediaFormat.KEY_PRIORITY, 0);
+                    }
+                    return true;
+                }
+                else if (tryNumber < 2) {
+                    // Some decoders reject realtime priority if they can't guarantee it
+                    videoFormat.setInteger("low-latency", 1);
+                    return true;
+                }
+                return false;
+
+            case LOW_LATENCY_MODE_VENDOR:
+                if (tryNumber < 1) {
+                    applyAllLowLatencyOptions(videoFormat, decoderInfo);
+                    return true;
+                }
+                // Fall back to the original sequence, which drops options one by one
+                return setDecoderLowLatencyOptions(videoFormat, decoderInfo, tryNumber - 1);
+
+            case LOW_LATENCY_MODE_ORIGINAL:
+            case LOW_LATENCY_MODE_AUTO:
+            default:
+                return setDecoderLowLatencyOptions(videoFormat, decoderInfo, tryNumber);
+        }
+    }
+
+    // Unlike the original try 0, this doesn't stop at KEY_LOW_LATENCY when the decoder advertises
+    // FEATURE_LowLatency, so vendor keys are applied too. Unknown vendor keys are ignored by Codec2.
+    private static void applyAllLowLatencyOptions(MediaFormat videoFormat, MediaCodecInfo decoderInfo) {
+        String name = decoderInfo.getName();
+
+        videoFormat.setInteger("low-latency", 1);
+
+        if (!Build.MANUFACTURER.equalsIgnoreCase("xiaomi") || Build.VERSION.SDK_INT > Build.VERSION_CODES.M) {
+            videoFormat.setInteger("vdec-lowlatency", 1);
+        }
+
+        if (decoderSupportsMaxOperatingRate(name)) {
+            videoFormat.setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE);
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            videoFormat.setInteger(MediaFormat.KEY_PRIORITY, 0);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (isDecoderInList(qualcommDecoderPrefixes, name)) {
+                videoFormat.setInteger("vendor.qti-ext-dec-picture-order.enable", 1);
+                videoFormat.setInteger("vendor.qti-ext-dec-low-latency.enable", 1);
+            }
+            else if (isDecoderInList(kirinDecoderPrefixes, name)) {
+                videoFormat.setInteger("vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-req", 1);
+                videoFormat.setInteger("vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-rdy", -1);
+            }
+            else if (isDecoderInList(exynosDecoderPrefixes, name)) {
+                videoFormat.setInteger("vendor.rtc-ext-dec-low-latency.enable", 1);
+            }
+            else if (isDecoderInList(amlogicDecoderPrefixes, name)) {
+                videoFormat.setInteger("vendor.low-latency.enable", 1);
+            }
+        }
+    }
+
+    private static final String[] LOW_LATENCY_FORMAT_KEYS = {
+            "low-latency",
+            "vdec-lowlatency",
+            MediaFormat.KEY_PRIORITY,
+            MediaFormat.KEY_OPERATING_RATE,
+            "vendor.qti-ext-dec-picture-order.enable",
+            "vendor.qti-ext-dec-low-latency.enable",
+            "vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-req",
+            "vendor.rtc-ext-dec-low-latency.enable",
+            "vendor.low-latency.enable",
+    };
+
+    /** ULL: Describes the low latency keys present in a configured format, for diagnostics. */
+    public static String describeLowLatencyKeys(MediaFormat format) {
+        if (format == null) {
+            return "(none)";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String key : LOW_LATENCY_FORMAT_KEYS) {
+            if (format.containsKey(key)) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(key);
+                try {
+                    sb.append('=').append(format.getInteger(key));
+                } catch (RuntimeException ignored) {
+                    // Not an integer key
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : "(none)";
+    }
+
+    public static String lowLatencyModeName(int mode) {
+        switch (mode) {
+            case LOW_LATENCY_MODE_AUTO:
+                return "auto";
+            case LOW_LATENCY_MODE_ORIGINAL:
+                return "original";
+            case LOW_LATENCY_MODE_STANDARD:
+                return "standard";
+            case LOW_LATENCY_MODE_VENDOR:
+                return "vendor";
+            case LOW_LATENCY_MODE_OFF:
+                return "off";
+            case LOW_LATENCY_MODE_PRIORITY_ONLY:
+                return "priority-only";
+            default:
+                return "unknown(" + mode + ")";
+        }
+    }
+
+    public static boolean isAmlogicDecoder(String decoderName) {
+        return isDecoderInList(amlogicDecoderPrefixes, decoderName);
+    }
+
+    public static boolean decoderAdvertisesLowLatency(MediaCodecInfo decoderInfo, String mimeType) {
+        return decoderSupportsAndroidRLowLatency(decoderInfo, mimeType);
+    }
+
+    /** ULL: Returns the Android 12+ vendor parameters of a decoder (creates a temporary instance). */
+    public static List<String> getSupportedVendorParameters(String decoderName) {
+        List<String> result = new LinkedList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaCodec codec = null;
+            try {
+                codec = MediaCodec.createByCodecName(decoderName);
+                result.addAll(codec.getSupportedVendorParameters());
+            } catch (Exception e) {
+                LimeLog.warning("Unable to query vendor parameters of " + decoderName + ": " + e);
+            } finally {
+                if (codec != null) {
+                    codec.release();
+                }
+            }
+        }
+        return result;
+    }
+
+    /** ULL: Hardware decoders for a MIME type, in MediaCodecList order (no aliases, no blacklisted). */
+    public static List<MediaCodecInfo> getHardwareDecodersForMime(String mimeType) {
+        List<MediaCodecInfo> result = new LinkedList<>();
+        for (MediaCodecInfo codecInfo : getMediaCodecList()) {
+            if (codecInfo.isEncoder()) {
+                continue;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && codecInfo.isAlias()) {
+                continue;
+            }
+            boolean supportsMime = false;
+            for (String mime : codecInfo.getSupportedTypes()) {
+                if (mime.equalsIgnoreCase(mimeType)) {
+                    supportsMime = true;
+                    break;
+                }
+            }
+            if (!supportsMime) {
+                continue;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (codecInfo.isSoftwareOnly() && !SHOULD_BYPASS_SOFTWARE_BLOCK) {
+                    continue;
+                }
+            }
+            else if (isDecoderInList(blacklistedDecoderPrefixes, codecInfo.getName())) {
+                continue;
+            }
+            result.add(codecInfo);
+        }
+        return result;
+    }
+
+    /** ULL: Finds a decoder by exact name that supports the given MIME type, or null. */
+    public static MediaCodecInfo findDecoderByName(String decoderName, String mimeType) {
+        if (decoderName == null) {
+            return null;
+        }
+        for (MediaCodecInfo codecInfo : getHardwareDecodersForMime(mimeType)) {
+            if (codecInfo.getName().equalsIgnoreCase(decoderName)) {
+                return codecInfo;
+            }
+        }
+        return null;
     }
 
     public static boolean decoderSupportsFusedIdrFrame(MediaCodecInfo decoderInfo, String mimeType) {

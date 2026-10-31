@@ -7,7 +7,10 @@ import android.os.Build;
 import android.preference.PreferenceManager;
 import android.view.Display;
 
+import com.limelight.binding.video.LatencyGuard;
+import com.limelight.binding.video.MediaCodecHelper;
 import com.limelight.nvstream.jni.MoonBridge;
+import com.limelight.utils.StreamThreadPriority;
 
 public class PreferenceConfiguration {
     public enum FormatOption {
@@ -68,6 +71,16 @@ public class PreferenceConfiguration {
     private static final String GAMEPAD_TOUCHPAD_AS_MOUSE_PREF_STRING = "checkbox_gamepad_touchpad_as_mouse";
     private static final String GAMEPAD_MOTION_SENSORS_PREF_STRING = "checkbox_gamepad_motion_sensors";
     private static final String GAMEPAD_MOTION_FALLBACK_PREF_STRING = "checkbox_gamepad_motion_fallback";
+
+    // ULL (Ultra Low Latency) preferences
+    static final String ULL_AVC_DECODER_PREF_STRING = "ull_avc_decoder";
+    static final String ULL_DETAILED_OVERLAY_PREF_STRING = "ull_detailed_overlay";
+    static final String ULL_RECORD_SESSIONS_PREF_STRING = "ull_record_sessions";
+    static final String ULL_FRAME_LOG_PREF_STRING = "ull_frame_log";
+    public static final String DECODER_AUTO = "auto";
+    private static final boolean DEFAULT_ULL_DETAILED_OVERLAY = true;
+    private static final boolean DEFAULT_ULL_RECORD_SESSIONS = true;
+    private static final boolean DEFAULT_ULL_FRAME_LOG = false;
 
     static final String DEFAULT_RESOLUTION = "1280x720";
     static final String DEFAULT_FPS = "60";
@@ -155,6 +168,16 @@ public class PreferenceConfiguration {
     public boolean gamepadMotionSensors;
     public boolean gamepadTouchpadAsMouse;
     public boolean gamepadMotionSensorsFallbackToDevice;
+
+    // ULL settings
+    public String latencyProfile;
+    public String avcDecoderName;
+    public int lowLatencyMode;
+    public int latencyGuardMode;
+    public int threadPriorityLevel;
+    public boolean detailedPerfOverlay;
+    public boolean recordSessions;
+    public boolean recordFrameLog;
 
     public static boolean isNativeResolution(int width, int height) {
         // It's not a native resolution if it matches an existing resolution option
@@ -443,7 +466,50 @@ public class PreferenceConfiguration {
                 Build.FINGERPRINT.contains("PPR1.180610.011/4079208_2235.1395");
     }
 
+    static int parseLowLatencyMode(String str) {
+        switch (str) {
+            case "original":
+                return MediaCodecHelper.LOW_LATENCY_MODE_ORIGINAL;
+            case "standard":
+                return MediaCodecHelper.LOW_LATENCY_MODE_STANDARD;
+            case "vendor":
+                return MediaCodecHelper.LOW_LATENCY_MODE_VENDOR;
+            case "off":
+                return MediaCodecHelper.LOW_LATENCY_MODE_OFF;
+            case "auto":
+            default:
+                return MediaCodecHelper.LOW_LATENCY_MODE_AUTO;
+        }
+    }
+
+    static int parseLatencyGuardMode(String str) {
+        switch (str) {
+            case "off":
+                return LatencyGuard.MODE_OFF;
+            case "normal":
+                return LatencyGuard.MODE_NORMAL;
+            case "aggressive":
+            default:
+                return LatencyGuard.MODE_AGGRESSIVE;
+        }
+    }
+
+    static int parseThreadPriority(String str) {
+        switch (str) {
+            case "normal":
+                return StreamThreadPriority.LEVEL_NORMAL;
+            case "max":
+                return StreamThreadPriority.LEVEL_MAX;
+            case "high":
+            default:
+                return StreamThreadPriority.LEVEL_HIGH;
+        }
+    }
+
     public static PreferenceConfiguration readPreferences(Context context) {
+        // Fresh installs start with the Ultra Low Latency profile
+        LatencyProfile.ensureInitialized(context);
+
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         PreferenceConfiguration config = new PreferenceConfiguration();
 
@@ -601,6 +667,16 @@ public class PreferenceConfiguration {
         config.gamepadTouchpadAsMouse = prefs.getBoolean(GAMEPAD_TOUCHPAD_AS_MOUSE_PREF_STRING, DEFAULT_GAMEPAD_TOUCHPAD_AS_MOUSE);
         config.gamepadMotionSensors = prefs.getBoolean(GAMEPAD_MOTION_SENSORS_PREF_STRING, DEFAULT_GAMEPAD_MOTION_SENSORS);
         config.gamepadMotionSensorsFallbackToDevice = prefs.getBoolean(GAMEPAD_MOTION_FALLBACK_PREF_STRING, DEFAULT_GAMEPAD_MOTION_FALLBACK);
+
+        // ULL settings
+        config.latencyProfile = prefs.getString(LatencyProfile.PREF_KEY, LatencyProfile.DEFAULT_PROFILE);
+        config.avcDecoderName = prefs.getString(ULL_AVC_DECODER_PREF_STRING, DECODER_AUTO);
+        config.lowLatencyMode = parseLowLatencyMode(prefs.getString(LatencyProfile.LOW_LATENCY_MODE_KEY, "auto"));
+        config.latencyGuardMode = parseLatencyGuardMode(prefs.getString(LatencyProfile.LATENCY_GUARD_KEY, "aggressive"));
+        config.threadPriorityLevel = parseThreadPriority(prefs.getString(LatencyProfile.THREAD_PRIORITY_KEY, "high"));
+        config.detailedPerfOverlay = prefs.getBoolean(ULL_DETAILED_OVERLAY_PREF_STRING, DEFAULT_ULL_DETAILED_OVERLAY);
+        config.recordSessions = prefs.getBoolean(ULL_RECORD_SESSIONS_PREF_STRING, DEFAULT_ULL_RECORD_SESSIONS);
+        config.recordFrameLog = prefs.getBoolean(ULL_FRAME_LOG_PREF_STRING, DEFAULT_ULL_FRAME_LOG);
 
         return config;
     }
