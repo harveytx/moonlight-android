@@ -18,11 +18,19 @@
      bitrate costs on the network (receive time, losses), not to judge image quality.
 
   Every frame is a pure function of its number (60 per second whatever the monitor's refresh
-  rate), shown in the header. To compare a capture taken by Moonlight ULL with the original,
-  press G, type the frame number seen in the capture, and take a screenshot of the PC: it shows
-  exactly the same content. The page can also be opened as image-test.html?frame=1234.
+  rate). The number and the state (motion, noise, help) are written in the header as text and as
+  a row of 36 black/white blocks that the tools can read from a capture.
 
-  Keys: M motion, N noise size, P pause, G go to frame, H help, F full screen.
+  Captures of the PC go in capturas/pc/, next to the captures of Moonlight ULL in
+  capturas/moonlight/ (ull-sessions/<version>/capturas/ copied from the TV box):
+  - B: choose that "capturas" folder; for every pattern capture in moonlight/, the page renders
+    exactly the same frame and saves it in pc/ with the same file name (Chrome or Edge).
+  - C: saves the frame on screen in pc/ (or as a download in other browsers).
+  - G: go to a frame number (also image-test.html?frame=1234), e.g. for a screenshot by hand.
+  The mouse pointer is hidden over the pattern so it does not appear in the captures.
+
+  Keys: M motion, N noise size, P pause, G go to frame, C save PC capture, B PC captures for a
+  folder, H help, F full screen.
 -->
 <html>
 <head>
@@ -30,7 +38,7 @@
 <title>Moonlight ULL - patrón de imagen</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-  canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; image-rendering: pixelated; }
+  canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; image-rendering: pixelated; cursor: none; }
 </style>
 </head>
 <body>
@@ -236,14 +244,65 @@ function drawStatic() {
   buildMotionLayers(L);
 }
 
+// Frame code, readable from a capture (tools/compare-captures.html and the B key decode it):
+// 36 black/white blocks = marker 1011, 24-bit frame number, motion, noise step (2 bits), help,
+// 4-bit check. A block must be clearly black or white, so other images are not misread.
+const CODE_CELLS = 36, CODE_MARKER = [1, 0, 1, 1];
+function codeLayout(w, h) {
+  const s = Math.max(0.6, Math.min(w / 1920, h / 1080));
+  const b = Math.max(4, Math.round(8 * s));
+  return { b, x: w - Math.round(20 * s) - CODE_CELLS * b, y: Math.round(8 * s) };
+}
+function codeCheck(payload) {
+  let check = 0;
+  for (let i = 0; i < 28; i += 4) check ^= (payload >>> i) & 0xf;
+  return check;
+}
+function codeBits(f, m, n, hlp) {
+  const payload = ((f & 0xffffff) | ((m ? 1 : 0) << 24) | ((n & 3) << 25) | ((hlp ? 1 : 0) << 27)) >>> 0;
+  const bits = CODE_MARKER.slice();
+  for (let i = 0; i < 28; i++) bits.push((payload >>> i) & 1);
+  const check = codeCheck(payload);
+  for (let i = 0; i < 4; i++) bits.push((check >>> i) & 1);
+  return bits;
+}
+function decodeCode(img) { // img: ImageData-like {width, height, data} of a whole capture
+  const { b, x, y } = codeLayout(img.width, img.height);
+  const bits = [];
+  for (let i = 0; i < CODE_CELLS; i++) {
+    let sum = 0, n = 0;
+    for (let yy = y + (b >> 2); yy < y + b - (b >> 2); yy++) for (let xx = x + i * b + (b >> 2); xx < x + (i + 1) * b - (b >> 2); xx++) {
+      const o = (yy * img.width + xx) * 4;
+      sum += 0.2126 * img.data[o] + 0.7152 * img.data[o + 1] + 0.0722 * img.data[o + 2]; n++;
+    }
+    const mean = sum / n;
+    if (mean > 175) bits.push(1); else if (mean < 80) bits.push(0); else return null;
+  }
+  for (let i = 0; i < 4; i++) if (bits[i] !== CODE_MARKER[i]) return null;
+  let payload = 0, check = 0;
+  for (let i = 0; i < 28; i++) payload |= bits[4 + i] << i;
+  for (let i = 0; i < 4; i++) check |= bits[32 + i] << i;
+  payload >>>= 0;
+  if (codeCheck(payload) !== check) return null;
+  return { frame: payload & 0xffffff, motion: !!((payload >>> 24) & 1), noise: (payload >>> 25) & 3, help: !!((payload >>> 27) & 1) };
+}
+function drawCode(L) {
+  const { b, x, y } = codeLayout(W, H);
+  codeBits(frame, motion, noiseStep, help).forEach((bit, i) => {
+    ctx.fillStyle = bit ? "#fff" : "#000";
+    ctx.fillRect(x + i * b, y, b, b);
+  });
+}
+
 function drawHeader(L) {
   const h = px(56 * L.s);
   ctx.drawImage(staticLayer, 0, 0, W, h, 0, 0, W, h);
+  drawCode(L);
   label(ctx, `Patrón de imagen ULL - pantalla ${W}x${H} px físicos (escala de Windows ${Math.round(dpr * 100)} %) - ` +
     `fotograma ${frame} - ${fps.toFixed(0)} FPS` + (paused ? " - PAUSA" : ""), L.pad, px(10 * L.s), 18 * L.s, "#fff");
   label(ctx, "Teclas: M movimiento " + (motion ? "sí" : "no") + ", N ruido " +
     (NOISE_SIZES[noiseStep] ? NOISE_SIZES[noiseStep] + " px" : "no") +
-    ", P pausa, G ir a un fotograma, H ayuda, F pantalla completa",
+    ", P pausa, G ir a fotograma, C guardar captura del PC, B capturas del PC de una carpeta, H ayuda, F pantalla completa",
     L.pad, px(34 * L.s), 14 * L.s);
 }
 
@@ -276,8 +335,9 @@ function drawHelp(L) {
     "4. Movimiento: compara bitrates/códecs en el texto que se desplaza y en la textura. Mira en el overlay de",
     "   Moonlight ULL 'Fotograma ... en el techo X %': si es bajo, subir el bitrate no cambia la imagen.",
     "5. Ruido (N): peor caso; llena cada fotograma hasta el techo para medir el coste de red de un bitrate.",
-    "6. Comparar con una captura de Moonlight ULL: pulsa G, escribe el número de fotograma de la captura y haz",
-    "   una captura del PC (Win+ImprPant): muestra exactamente el mismo contenido. Oculta esta ayuda (H) en ambas.",
+    "6. Capturas del PC: copia ull-sessions/<versión>/capturas del ZTE al PC, pulsa B y elige esa carpeta: por cada",
+    "   captura de Moonlight del patrón (capturas/moonlight) se guarda la del PC con el mismo nombre en capturas/pc.",
+    "   C guarda el fotograma de la pantalla en capturas/pc. Después: tools/compare-captures.html.",
   ];
   const x = L.pad, y = L.motionY, w = L.motionX - 2 * L.pad, lh = px(22 * L.s);
   ctx.fillStyle = "rgba(0,0,0,0.85)";
@@ -302,14 +362,98 @@ function goToFrame(n) {
   frame = Math.floor(n);
 }
 
+function renderFrame() {
+  const L = layout();
+  ctx.drawImage(staticLayer, 0, 0);
+  drawHeader(L);
+  drawMotion(L);
+  drawHelp(L);
+}
+
+// ---- Captures of the PC (saved in capturas/pc/) ----
+let capturesDir = null; // "capturas" folder chosen by the user (File System Access API)
+
+async function chooseCapturesDir() {
+  if (!window.showDirectoryPicker) return null;
+  let dir = await window.showDirectoryPicker({ mode: "readwrite" });
+  // Accept the version folder too (ull-sessions/<version>/ that contains capturas/)
+  for await (const [name, handle] of dir.entries()) {
+    if (name === "capturas" && handle.kind === "directory") { dir = handle; break; }
+  }
+  capturesDir = dir;
+  return dir;
+}
+
+function canvasBlob() {
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+async function savePcCapture(name, blob) {
+  const pc = await capturesDir.getDirectoryHandle("pc", { create: true });
+  const fh = await pc.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  await w.write(blob);
+  await w.close();
+}
+
+let status = "";
+function showStatus(text) { status = text; }
+
+async function saveCurrentFrame() {
+  const wasPaused = paused;
+  setPaused(true);
+  renderFrame();
+  const blob = await canvasBlob();
+  const name = `pc-fotograma-${frame}.png`;
+  try {
+    if (!capturesDir && window.showDirectoryPicker) await chooseCapturesDir();
+    if (capturesDir) { await savePcCapture(name, blob); showStatus(`Guardado capturas/pc/${name}`); }
+    else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      showStatus(`Descargado ${name} (muévelo a capturas/pc)`);
+    }
+  } catch (err) { showStatus("No se guardó: " + err.message); }
+  if (!wasPaused) setPaused(false);
+}
+
+async function capturesForFolder() {
+  if (!window.showDirectoryPicker) { showStatus("La tecla B necesita Chrome o Edge"); return; }
+  const saved = { frame, motion, noiseStep, help, paused };
+  setPaused(true);
+  let done = 0, skipped = 0;
+  try {
+    const dir = await chooseCapturesDir();
+    const moonlight = await dir.getDirectoryHandle("moonlight");
+    for await (const [name, handle] of moonlight.entries()) {
+      if (handle.kind !== "file" || !name.toLowerCase().endsWith(".png")) continue;
+      const bmp = await createImageBitmap(await handle.getFile());
+      if (bmp.width !== W || bmp.height !== H) { skipped++; continue; }
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const cx = c.getContext("2d"); cx.drawImage(bmp, 0, 0);
+      const code = decodeCode(cx.getImageData(0, 0, W, H));
+      if (!code) { skipped++; continue; } // not a capture of this pattern
+      frame = code.frame; motion = code.motion; noiseStep = code.noise; help = code.help;
+      renderFrame();
+      await savePcCapture(name, await canvasBlob());
+      done++;
+      showStatus(`Capturas del PC: ${done} guardadas...`);
+    }
+    showStatus(`Capturas del PC: ${done} guardadas en capturas/pc` +
+      (skipped ? `, ${skipped} omitidas (no son del patrón o la resolución no es ${W}x${H})` : ""));
+  } catch (err) { showStatus("Error: " + err.message); }
+  frame = saved.frame; motion = saved.motion; noiseStep = saved.noiseStep; help = saved.help;
+  if (!saved.paused) setPaused(false);
+}
+
 function tick() {
   if (W && staticLayer) {
-    const L = layout();
     if (!paused) frame = contentFrame(performance.now());
-    ctx.drawImage(staticLayer, 0, 0);
-    drawHeader(L);
-    drawMotion(L);
-    drawHelp(L);
+    renderFrame();
+    if (status) {
+      const L = layout();
+      label(ctx, status, L.pad, H - px(30 * L.s), 16 * L.s, "#fc6");
+    }
     fpsFrames++;
     const now = performance.now();
     if (now - fpsStart >= 1000) { fps = fpsFrames * 1000 / (now - fpsStart); fpsFrames = 0; fpsStart = now; }
@@ -347,6 +491,8 @@ addEventListener("keydown", (e) => {
   else if (k === "p" || k === " ") setPaused(!paused);
   else if (k === "g") goToFrame(Number(prompt("Fotograma (número que aparece en la captura):", String(frame))));
   else if (k === "h") help = !help;
+  else if (k === "c") saveCurrentFrame();
+  else if (k === "b") capturesForFolder();
   else if (k === "f") { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
 });
 const startFrame = Number(new URLSearchParams(location.search).get("frame"));

@@ -51,6 +51,20 @@ public final class SessionReport {
     private static final String UNVERSIONED_DIRECTORY = "unversioned";
     private static boolean legacyFilesMigrated;
 
+    /** Captures folder inside each version folder, with one subfolder per source. */
+    public static final String CAPTURES_DIRECTORY = "capturas";
+    /** Frames captured by Moonlight ULL on the TV box. */
+    public static final String CAPTURES_MOONLIGHT = "moonlight";
+    /** Reference captures of the PC (made on the PC, e.g. with tools/image-test.html). */
+    public static final String CAPTURES_PC = "pc";
+    private static final String PC_README_NAME = "LEEME.txt";
+    private static final String PC_README =
+            "Carpeta para las capturas del PC (las del ZTE estan en ../moonlight).\n" +
+            "Copia esta carpeta de versiones (ull-sessions/<version>) al PC y genera aqui las capturas\n" +
+            "del PC con tools/image-test.html (tecla B: crea una captura del PC por cada captura de\n" +
+            "Moonlight del patron) o pon aqui tus propias capturas de pantalla del PC.\n" +
+            "Despues, tools/compare-captures.html compara la carpeta moonlight con esta.\n";
+
     /** ull-sessions/, which contains one folder per app version. */
     public static File getRootDirectory(Context context) {
         File base = context.getExternalFilesDir(null);
@@ -67,10 +81,69 @@ public final class SessionReport {
     public static synchronized File getDirectory(Context context) {
         File root = getRootDirectory(context);
         migrateLegacyFiles(root);
+        migrateCaptures(root);
         File dir = new File(root, versionFolderName(BuildConfig.VERSION_NAME));
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
+    }
+
+    /**
+     * capturas/<source>/ inside the folder of the running version. Creating it also creates
+     * capturas/pc/ with a short note, so the layout is there when the folder is copied to the PC.
+     */
+    public static synchronized File getCaptureDirectory(Context context, String source) {
+        File captures = new File(getDirectory(context), CAPTURES_DIRECTORY);
+        File dir = new File(captures, source);
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        File pcDir = new File(captures, CAPTURES_PC);
+        File readme = new File(pcDir, PC_README_NAME);
+        if (!readme.exists() && (pcDir.isDirectory() || pcDir.mkdirs())) {
+            try {
+                writeString(readme, PC_README);
+            } catch (IOException e) {
+                LimeLog.warning("Unable to write " + readme + ": " + e);
+            }
+        }
+        return dir;
+    }
+
+    private static boolean capturesMigrated;
+
+    /**
+     * 12.2-ULL.7 saved captures next to the reports; move them once into capturas/moonlight/ of
+     * their version folder so captures of the PC and of the box are always kept apart.
+     */
+    private static void migrateCaptures(File root) {
+        if (capturesMigrated) {
+            return;
+        }
+        capturesMigrated = true;
+        File[] versionDirs = root.listFiles();
+        if (versionDirs == null) {
+            return;
+        }
+        for (File versionDir : versionDirs) {
+            File[] files = versionDir.isDirectory() ? versionDir.listFiles() : null;
+            if (files == null) {
+                continue;
+            }
+            for (File f : files) {
+                if (f.isFile() && isCaptureFileName(f.getName())) {
+                    File target = new File(new File(new File(versionDir, CAPTURES_DIRECTORY), CAPTURES_MOONLIGHT), f.getName());
+                    //noinspection ResultOfMethodCallIgnored
+                    target.getParentFile().mkdirs();
+                    if (!target.exists() && !f.renameTo(target)) {
+                        LimeLog.warning("Unable to move " + f + " to " + target);
+                    }
+                }
+            }
+        }
+    }
+
+    static boolean isCaptureFileName(String name) {
+        return name.startsWith("capture-") && name.endsWith(".png");
     }
 
     static String versionFolderName(String versionName) {

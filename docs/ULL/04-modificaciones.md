@@ -39,14 +39,15 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `diagnostics/AnnexBClip.java` | Divide un flujo Annex B en unidades como las entrega moonlight-common-c. |
 | `diagnostics/SessionReport.java` | Informes JSON/CSV, listado, texto legible y comparación A/B. |
 | `diagnostics/StreamCapture.java` | Capturas periódicas del fotograma decodificado (PixelCopy → PNG) para comparar con el PC (ULL.7). |
+| `diagnostics/FastPngWriter.java` | Codificador PNG mínimo y rápido (RGB, filtro Sub, nivel de deflate elegible) para las capturas (ULL.8). |
 | `res/layout/activity_ull_diagnostics.xml`, `activity_ull_decoder_benchmark.xml` | Interfaces. |
 | `res/values/strings_ull.xml`, `arrays_ull.xml` (+ `values-es`) | Textos en inglés y español. |
 | `assets/bench/h264_1080p60.h264`, `hevc_1080p60.h265` | Clips sintéticos de 120 fotogramas con contador visible (generados con `tools/generate-bench-clips.sh`). |
-| `app/src/test/...` (10 clases, 46 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser, recomendación, informes, presupuesto de bitrate y capturas. |
+| `app/src/test/...` (11 clases, 50 tests) | Tests JVM de histograma, jitter, protección, estadísticas, parser, recomendación, informes, presupuesto de bitrate, capturas y PNG. |
 | `tools/*` | Reloj de latencia, patrón de imagen, comparador de capturas, script adb, comparador de sesiones, generador de clips. |
 | `.github/workflows/build-ull.yml` | Compilación y tests en GitHub Actions, firma opcional con secretos. |
 | `docs/ULL/*` | Esta documentación. |
-| `dist/MoonlightULL-12.2-ULL.7.apk` | APK compilado (release, R8). |
+| `dist/MoonlightULL-12.2-ULL.8.apk` | APK compilado (release, R8). |
 
 ## 4.3 Versión 12.2-ULL.2 (a partir de las medidas del ZTE)
 
@@ -118,7 +119,20 @@ Todas las modificaciones del código original están marcadas en comentarios con
 | `app/build.gradle` | Versión `12.2-ULL.7` (31507). |
 | Tests | 46 (nuevos: `StreamCaptureTest`, `CaptureIntervalTest`). |
 
-## 4.9 Compatibilidad
+## 4.9 Versión 12.2-ULL.8
+
+| Archivo | Cambio |
+|---|---|
+| `diagnostics/SessionReport.java` | `capturas/moonlight/` y `capturas/pc/` (con `LEEME.txt`) dentro de cada carpeta de versión; las capturas de ULL.7 se mueven a `capturas/moonlight/` una vez. |
+| `diagnostics/FastPngWriter.java` (nuevo), `diagnostics/StreamCapture.java` | PNG sin comprimir durante el stream y recompresión al terminar la sesión (se detiene si empieza otra); tiempos de copia y de PNG en el resultado de cada captura. |
+| `binding/video/PipelineStats.java`, `Game.java` | Columna `capture` en el CSV por fotograma (marca el fotograma de cada captura). |
+| `utils/StreamWarnings.java`, strings | Aviso si los FPS superan el refresco máximo de la pantalla. |
+| `tools/image-test.html` | Código de fotograma (36 bloques), teclas B y C (capturas del PC en `capturas/pc`), puntero oculto. |
+| `tools/compare-captures.html` | Modo carpeta con emparejado por nombre o código de fotograma y medias por configuración; nitidez por diferencias entre vecinos (Sobel no ve los patrones de 1 px). |
+| `app/build.gradle` | Versión `12.2-ULL.8` (31508). |
+| Tests | 50 (nuevos: `FastPngWriterTest` con decodificador propio y comprobación de CRC, migración de capturas). |
+
+## 4.10 Compatibilidad
 
 * Protocolo y negociación con Sunshine sin cambios.
 * `minSdk 21` se mantiene; todas las API nuevas están protegidas por versión (p. ej.

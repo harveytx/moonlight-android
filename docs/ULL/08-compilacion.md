@@ -24,7 +24,7 @@ $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;an
     "build-tools;37.0.0" "ndk;29.0.14206865"
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-./gradlew testNonRootDebugUnitTest      # 46 tests JVM
+./gradlew testNonRootDebugUnitTest      # 50 tests JVM
 ./gradlew assembleNonRootRelease        # APK: app/build/outputs/apk/nonRoot/release/
 ```
 

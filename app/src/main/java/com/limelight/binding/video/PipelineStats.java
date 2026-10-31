@@ -157,8 +157,8 @@ public class PipelineStats {
     /** Optional per-frame log, kept in memory and written out when the session ends. */
     public static class FrameLog {
         public static final String HEADER = "frame,receive_ms,submit_ms,input_wait_ms,decode_ms,pacing_ms," +
-                "rendered,client_ms,queue_delay_ms,host_ms,bytes,jni_ms";
-        public static final int COLUMNS = 12;
+                "rendered,client_ms,queue_delay_ms,host_ms,bytes,jni_ms,capture";
+        public static final int COLUMNS = 13;
 
         private final float[] data;
         private final int capacity;
@@ -195,7 +195,7 @@ public class PipelineStats {
                         sb.append(',');
                     }
                     float v = data[i * COLUMNS + c];
-                    if (c == 0 || c == 6 || c == 10) {
+                    if (c == 0 || c == 6 || c == 10 || c == 12) {
                         sb.append((long) v);
                     }
                     else if (v < 0) {
@@ -252,6 +252,8 @@ public class PipelineStats {
     private long inFlight;
     private FrameLog frameLog;
     private int frameCeilingBytes;
+    // ULL: set when a video capture is taken; the next logged frame is marked in the CSV
+    private boolean captureMark;
 
     private static LatencyHistogram[] newStageArray() {
         LatencyHistogram[] stages = new LatencyHistogram[HISTOGRAM_COUNT];
@@ -277,6 +279,11 @@ public class PipelineStats {
 
     public synchronized int getFrameCeilingBytes() {
         return frameCeilingBytes;
+    }
+
+    /** Marks the next frame in the per-frame log (a video capture was taken at this moment). */
+    public synchronized void markCapture() {
+        captureMark = true;
     }
 
     public synchronized FrameLog getFrameLog() {
@@ -412,7 +419,9 @@ public class PipelineStats {
                     recQueueDelayNs[idx] >= 0 ? ms(recQueueDelayNs[idx]) : -1,
                     recHostTenthsMs[idx] / 10.0f,
                     recBytes[idx],
-                    ms(recEntryNs[idx] - recEnqueueNs[idx]));
+                    ms(recEntryNs[idx] - recEnqueueNs[idx]),
+                    captureMark ? 1 : 0);
+            captureMark = false;
         }
     }
 

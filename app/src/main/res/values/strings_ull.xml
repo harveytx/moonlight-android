@@ -49,6 +49,7 @@
     <string name="ull_warning_no_allm">The display (%1$s) does not advertise ALLM (automatic game mode). If it is a TV, enable its Game mode manually: TV picture processing can add tens of milliseconds. PC monitors usually don\'t process the image and need nothing.</string>
     <string name="ull_display_unknown">name not reported</string>
     <string name="ull_warning_bitrate_link">%1$d Mbps on %2$d Mbps Ethernet: a full-size frame (~%3$.0f kB) takes ~%4$.1f ms to arrive (20 Mbps: ~%5$.1f ms). Try HEVC first.</string>
+    <string name="ull_warning_fps_above_refresh">%1$d FPS on a %2$d Hz display: some frames are never shown and each one gets fewer bits. Use %2$d FPS for sharpness.</string>
     <string name="ull_overlay_network_congested">WARNING: sustained network queueing. Lower the bitrate or check the network.</string>
 
     <!-- Diagnostics -->

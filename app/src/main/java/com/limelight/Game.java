@@ -2272,6 +2272,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         SessionReport.save(Game.this, renderer, sessionPrefs, pcName, appName,
                                 capture != null ? capture.getResults() : null);
                     }
+
+                    // ULL: captures were stored uncompressed during the stream; compress them now
+                    if (capture != null) {
+                        capture.recompressAfterSession();
+                    }
                 }
             }.start();
         }
@@ -2451,6 +2456,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                 status == StreamCapture.STATUS_BLACK ? R.string.ull_capture_first_black :
                                         R.string.ull_capture_first_failed;
                         displayTransientMessage(getString(message, detail));
+                    }
+                },
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        renderer.getPipelineStats().markCapture();
                     }
                 });
         streamCapture.start();

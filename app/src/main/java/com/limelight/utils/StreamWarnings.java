@@ -53,6 +53,18 @@ public final class StreamWarnings {
         return info.getName().trim();
     }
 
+    /** Highest refresh rate the display supports, or 0 if unknown. */
+    private static float getMaxRefreshRate(Activity activity) {
+        android.view.Display display = activity.getWindowManager().getDefaultDisplay();
+        float max = display.getRefreshRate();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            for (android.view.Display.Mode mode : display.getSupportedModes()) {
+                max = Math.max(max, mode.getRefreshRate());
+            }
+        }
+        return max;
+    }
+
     /** Link speed in kbps if the active network is wired Ethernet, otherwise -1. */
     private static int getEthernetLinkKbps(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -81,6 +93,14 @@ public final class StreamWarnings {
                     prefs.bitrate / 1000, linkKbps / 1000, ceilingBytes / 1000.0,
                     BitrateBudget.estimateTransferMs(ceilingBytes, linkKbps),
                     BitrateBudget.estimateTransferMs(referenceBytes, linkKbps)));
+        }
+
+        // More FPS than the display can show: half of the frames are never displayed and each one
+        // gets less of the bitrate (measured on the ZTE: 120 FPS on its 60 Hz output, 12.2-ULL.7)
+        float maxRefresh = getMaxRefreshRate(activity);
+        if (maxRefresh > 0 && prefs.fps > maxRefresh + 1) {
+            warnings.add(activity.getString(R.string.ull_warning_fps_above_refresh,
+                    prefs.fps, Math.round(maxRefresh)));
         }
 
         if (!isMinimalPostProcessingSupported(activity)) {

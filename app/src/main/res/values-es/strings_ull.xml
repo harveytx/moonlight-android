@@ -49,6 +49,7 @@
     <string name="ull_warning_no_allm">La pantalla (%1$s) no anuncia ALLM (modo juego automático). Si es un TV, activa a mano su Modo Juego: el procesado de imagen del TV puede añadir decenas de milisegundos. Los monitores de PC normalmente no procesan la imagen y no necesitan nada.</string>
     <string name="ull_display_unknown">nombre no disponible</string>
     <string name="ull_warning_bitrate_link">%1$d Mbps en Ethernet de %2$d Mbps: un fotograma completo (~%3$.0f kB) tarda ~%4$.1f ms en llegar (20 Mbps: ~%5$.1f ms). Prueba antes HEVC.</string>
+    <string name="ull_warning_fps_above_refresh">%1$d FPS en una pantalla de %2$d Hz: parte de los fotogramas no se ve y cada uno recibe menos bits. Para nitidez, %2$d FPS.</string>
     <string name="ull_overlay_network_congested">AVISO: cola de red sostenida. Baja el bitrate o revisa la red.</string>
 
     <!-- Diagnóstico -->

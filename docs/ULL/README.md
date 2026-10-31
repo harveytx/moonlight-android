@@ -4,8 +4,8 @@ Versión optimizada de [Moonlight Android](https://github.com/moonlight-stream/m
 centrada en reducir la latencia de recepción, decodificación y presentación de vídeo **H.264**
 procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como dispositivo objetivo.
 
-> **Estado de la validación (versión 12.2-ULL.7).**
-> Compila, el APK se genera y los 46 tests unitarios pasan. Medidas reales en el ZTE
+> **Estado de la validación (versión 12.2-ULL.8).**
+> Compila, el APK se genera y los 50 tests unitarios pasan. Medidas reales en el ZTE
 > ([09-resultados-zte.md](09-resultados-zte.md)): SoC S905Y4 confirmado. En este equipo, la
 > configuración de decodificador de Moonlight original ya es óptima (H.264 1080p ≈ 2,3 ms con
 > `low-latency=1`). La mejora de "standard" que se anunció en ULL.2 **no se reprodujo** y se ha
@@ -26,6 +26,12 @@ procedente de **Sunshine**, con el **ZTE ZXV10 B866V2K (Android TV 14)** como di
 > contenido, a 20 y 50 Mbps muchos fotogramas tocan el techo (36–100 % y 59 %). La app puede guardar
 > el fotograma decodificado cada 30 s, y `tools/compare-captures.html` lo compara con la captura del
 > PC.
+>
+> **Capturas reales (ULL.8, [9.11](09-resultados-zte.md#911-séptima-ronda-ull7-31-10-2026-12391304-capturas-reales-y-versión-ull8)).**
+> Las capturas funcionan en el ZTE. En el patrón a 80 Mbps, el detalle de luma llega idéntico (1 px)
+> o casi (98 % en movimiento); se pierde el color fino (4:2:0). A 120 FPS sobre 60 Hz y 80 Mbps hubo
+> pérdidas de red y fotogramas en el techo: para nitidez, 60 FPS. Las capturas del PC y las de
+> Moonlight van en carpetas separadas (`capturas/pc`, `capturas/moonlight`).
 
 ## Qué cambia respecto a Moonlight original
 
@@ -45,8 +51,8 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 
 ## Instalación rápida en el ZTE
 
-1. Copia `dist/MoonlightULL-12.2-ULL.7.apk` a una memoria USB o usa `adb install`:
-   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.7.apk`
+1. Copia `dist/MoonlightULL-12.2-ULL.8.apk` a una memoria USB o usa `adb install`:
+   `adb connect <ip-del-zte>:5555 && adb install -r dist/MoonlightULL-12.2-ULL.8.apk`
 2. Abre **Moonlight ULL**, empareja con Sunshine como siempre.
 3. **Ajustes → Ultra Low Latency → Diagnóstico y benchmark**:
    1. *Informe de capacidades del dispositivo* (guárdalo; es la información real del hardware).
@@ -66,7 +72,7 @@ eliminación de copias en JNI, recvmmsg…) está justificado en
 6. [06-zte-b866v2k.md](06-zte-b866v2k.md) — Hardware del ZTE, limitaciones y pruebas necesarias.
 7. [07-sunshine.md](07-sunshine.md) — Configuración recomendada de Sunshine.
 8. [08-compilacion.md](08-compilacion.md) — Cómo compilar futuras versiones.
-9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE**, cambios derivados de cada ronda (ULL.2–ULL.7), imagen a 80 Mbps (9.9) y nitidez frente al PC (9.10).
+9. [09-resultados-zte.md](09-resultados-zte.md) — **Medidas reales del ZTE**, cambios derivados de cada ronda (ULL.2–ULL.8), imagen a 80 Mbps (9.9), nitidez frente al PC (9.10, 9.11).
 
 ## Dónde se guardan los informes
 
@@ -74,8 +80,11 @@ En el propio equipo, sin permisos especiales, con **una carpeta por versión** d
 
 ```
 /sdcard/Android/data/com.limelight.ull/files/ull-sessions/
-├── 12.2-ULL.7/        capabilities-*.txt, decoder-bench-*.txt, session-*.json, session-*-frames.csv, capture-*.png
-├── 12.2-ULL.6/        ...
+├── 12.2-ULL.8/        capabilities-*.txt, decoder-bench-*.txt, session-*.json, session-*-frames.csv
+│   └── capturas/
+│       ├── moonlight/  capturas del vídeo decodificado en el ZTE (capture-*.png)
+│       └── pc/         capturas del PC (tecla B de tools/image-test.html, o propias)
+├── 12.2-ULL.7/        ...
 └── unversioned/       informes de capacidades y benchmarks de versiones anteriores a ULL.5
 ```
 
@@ -86,8 +95,8 @@ En el propio equipo, sin permisos especiales, con **una carpeta por versión** d
 | Archivo | Uso |
 |---|---|
 | `latency-clock.html` | Reloj en milisegundos para medir latencia de extremo a extremo con cámara lenta (y entrada→pantalla con mando). |
-| `image-test.html` | Patrón de imagen en píxeles físicos del PC: escalado, negros/blancos, croma 4:2:0, texto y textura en movimiento, ruido para forzar el techo de bitrate. Cada fotograma se puede reproducir exactamente (tecla G o `?frame=N`). |
-| `compare-captures.html` | Compara una captura del ZTE con la del PC: nitidez relativa, SSIM, PSNR de luma y croma, nivel; vistas lado a lado, parpadeo y diferencia. |
+| `image-test.html` | Patrón de imagen en píxeles físicos del PC: escalado, negros/blancos, croma 4:2:0, texto y textura en movimiento, ruido para forzar el techo de bitrate. Lleva un código de fotograma; la tecla **B** crea en `capturas/pc` la captura del PC de cada captura de Moonlight y **C** guarda la de la pantalla. |
+| `compare-captures.html` | Compara `capturas/moonlight` con `capturas/pc` (o una pareja): nitidez relativa, SSIM, PSNR de luma y croma, nivel, por zona estática y de movimiento; vistas lado a lado, parpadeo y diferencia. |
 | `collect-diagnostics.sh` | Recoge por `adb` la información del dispositivo y los informes de la app. |
 | `compare-sessions.py` | Compara dos informes de sesión (y sus CSV por fotograma con test estadístico). |
 | `generate-bench-clips.sh` | Regenera los clips sintéticos del benchmark. |

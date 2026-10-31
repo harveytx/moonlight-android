@@ -5,7 +5,7 @@
 | Verificación | Estado | Cómo |
 |---|---|---|
 | El código compila (Java + nativo, 4 ABIs) y R8/lint vital pasan | ✅ Hecho | `./gradlew assembleNonRootRelease` |
-| Lógica nueva (histograma, jitter, protección de latencia, estadísticas, parser Annex B, regla de recomendación) | ✅ 46/46 tests pasan | `./gradlew testNonRootDebugUnitTest` |
+| Lógica nueva (histograma, jitter, protección de latencia, estadísticas, parser Annex B, regla de recomendación) | ✅ 50/50 tests pasan | `./gradlew testNonRootDebugUnitTest` |
 | Los clips del benchmark tienen la estructura esperada (IDR + 119 P, SPS/PPS, 1 slice) | ✅ Test + `ffprobe` | `AnnexBClipTest` |
 | Funcionamiento en el ZTE B866V2K | ❌ **Pendiente** | Requiere el dispositivo (no disponible en el entorno de desarrollo, sin KVM para emulador) |
 | Mejora de latencia frente a Moonlight original | ❌ **Pendiente de medir** | Procedimiento de 5.3–5.5 |
@@ -105,20 +105,23 @@ Separa lo que pierde la compresión (medible píxel a píxel) de lo que añade l
 ZTE y el monitor (solo visible con foto).
 
 1. Moonlight ULL: *Ajustes → Ultra Low Latency → Ajustes avanzados → Capturas del vídeo para
-   comparar la imagen*: **Cada 30 s**. La primera captura llega a los 5 s y un aviso dice si
-   funcionó o si sale negra: algunos equipos ponen el vídeo en un plano que las apps no pueden
-   leer. Las capturas son PNG del fotograma decodificado y se guardan en `ull-sessions/<versión>/`
-   con el códec y el bitrate en el nombre. El informe de sesión las lista.
+   comparar la imagen*: **Cada 30 s**. Usa los FPS del refresco de la pantalla: en el ZTE, 60. La
+   primera captura llega a los 5 s y un aviso dice si funcionó. Las capturas son PNG del fotograma
+   decodificado, con el códec y el bitrate en el nombre, y se guardan en
+   `ull-sessions/<versión>/capturas/moonlight/`. El informe de sesión las lista y el CSV por
+   fotograma las marca (columna `capture`).
 2. PC: `tools/image-test.html` a pantalla completa, con la ayuda oculta (H). Haz la sesión con
    movimiento (M) para ver la calidad en movimiento, o en pausa (P) para el límite en imagen
    estática.
-3. Por cada captura del ZTE, apunta el número de fotograma de su cabecera. En el PC, pulsa G,
-   escribe ese número y haz una captura de pantalla (Win+ImprPant). El patrón muestra exactamente
-   el mismo contenido.
-4. `tools/compare-captures.html` (en el navegador del PC): original = captura del PC, stream =
-   captura del ZTE. Mide nitidez relativa (energía de gradiente), SSIM, PSNR de luma y de croma y
-   desplazamiento de nivel en la zona estática, la de movimiento o una zona elegida. Tiene vistas
-   lado a lado, parpadeo y diferencia, con zoom.
+3. Copia `ull-sessions/<versión>/` del ZTE al PC. En el patrón, también a pantalla completa en el
+   mismo monitor, pulsa **B** y elige la carpeta `capturas`. Por cada captura de Moonlight del
+   patrón, el navegador dibuja exactamente el mismo fotograma (lo lee del código de la cabecera) y
+   lo guarda en `capturas/pc/` con el mismo nombre. Para otro contenido (un juego en pausa, el
+   escritorio), pon tus capturas del PC en `capturas/pc/` con el mismo nombre que la de Moonlight.
+4. `tools/compare-captures.html` → carpeta `capturas`. Muestra una tabla por pareja y medias por
+   configuración: nitidez relativa (energía de gradiente entre píxeles vecinos), SSIM y PSNR de luma
+   y croma, en la zona estática y en la de movimiento. Haciendo clic en una fila se abre la vista
+   detallada: lado a lado, parpadeo y diferencia, con zoom.
 5. Repite con cada configuración (bitrate, códec, ajustes de Sunshine). Lo que falte para "igual de
    nítido" en las capturas es compresión. Si las capturas son nítidas pero el monitor no, la
    pérdida está en la salida de vídeo del ZTE o en el monitor.

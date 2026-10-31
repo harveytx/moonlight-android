@@ -557,3 +557,104 @@ conectada a la salida del ZTE. Esa medida incluiría también el procesado del Z
 3. Para 2 o 3 capturas de cada configuración: tecla G con su número de fotograma y captura del PC.
    Compara en `compare-captures.html` la zona estática y la de movimiento.
 4. Envía `ull-sessions/12.2-ULL.7/` (con los PNG) y las capturas del PC.
+
+## 9.11 Séptima ronda (ULL.7, 31-10-2026 12:39–13:04): capturas reales y versión ULL.8
+
+Datos en [data/zte-b866v2k/12.2-ULL.7/](data/zte-b866v2k/12.2-ULL.7/): 9 sesiones (5 con CSV por
+fotograma), benchmark, capacidades y las 4 capturas del patrón en `capturas/moonlight/`. Las 13
+capturas de un juego y de un vídeo no se guardan en el repositorio, porque son imágenes de terceros y
+pesan mucho; sí se usaron en el análisis.
+
+### Las capturas funcionan en el ZTE
+
+Las 81 capturas de las sesiones salieron bien: 1920×1080 y ninguna negra. `PixelCopy` puede leer el
+vídeo del decodificador Amlogic.
+
+### Lo que costaban las capturas (ULL.7)
+
+* Guardar cada PNG con el codificador de Android tardaba **0,75–7,5 s** en el Cortex-A35.
+* Mientras tanto, la decodificación se frenaba. Alrededor de cada captura, los fotogramas pasaban de
+  2–3 ms a 20–60 ms y luego se vaciaba la cola acumulada. Cuanto más tardaba el PNG, más fotogramas
+  se veían afectados: con 0,8–1 s, de 1 a 3 fotogramas; con 5–7 s, de 28 a 121.
+* En las sesiones cortas con capturas cada 10 s, la decodificación p95 pasó de 3,9–5,8 ms a
+  35–38 ms. El decodificador llegó a saturarse y la protección de latencia pidió de 2 a 5 IDR. Esas
+  resincronizaciones también empeoran la imagen.
+* **ULL.8:** durante el stream el PNG se guarda **sin comprimir** y se recomprime al acabar la
+  sesión, deteniéndose si empieza otra. El CSV por fotograma marca en la columna `capture` el
+  fotograma de cada captura.
+* En un PC de escritorio, con una captura del juego, el PNG del codificador de ULL.8 tarda 12 ms sin
+  comprimir y 483 ms con compresión normal; el de Android además prueba 5 filtros por fila. Hay que
+  confirmarlo en el ZTE con la nueva columna.
+
+### Todas las sesiones fueron a 120 FPS con la pantalla a 60 Hz
+
+* **El techo por fotograma se reduce a la mitad.** A 80 Mbps y 120 FPS cada fotograma tiene un
+  techo de 66 kB, lo mismo que 40 Mbps a 60 FPS. En las sesiones del juego, el 89–94 % de los
+  fotogramas estaban en el techo, así que 80 Mbps no daba la nitidez esperada.
+* **La mitad de los fotogramas no se ve.** El ZTE muestra 60 por segundo y se reciben hasta ~119.
+* **El decodificador H.264 va al límite.** Su máximo medido es de 138 FPS ("120 FPS NOT
+  sustainable" en el benchmark), y cualquier carga extra, como las capturas, lo satura.
+* **ULL.8 avisa** al empezar si los FPS superan el refresco de la pantalla.
+
+### Pérdidas de red a 80 Mbps
+
+| Sesión | Bitrate configurado / real | Fotogramas perdidos | Eventos de pérdida |
+|---|---|---|---|
+| 12:39:37 | 28 / 11,3 Mbps | 0 | 0 |
+| 12:42:36 | 80 / 55,2 | 49 (0,3 %) | 1 |
+| 12:47:07 | 80 / 21,7 | 0 | 0 |
+| 12:49:55 | 80 / 23,5 | 61 (0,6 %) | 2 |
+| 12:52:11 | 80 / 28,4 | 103 (1,3 %) | 4 |
+| 13:04:19 (12 min) | 80 / 12,3 | 187 (0,3 %) | 6 |
+| 13:04:39 | 80 / 50,5 | 120 (6,1 %) | 3 |
+
+Es la primera vez que aparecen pérdidas: en todas las sesiones anteriores, todas a ≤ 50 Mbps, hubo 0.
+A 80 Mbps y 120 FPS, por el puerto de 100 Mbps, se pierden fotogramas en 6 de las 8 sesiones. Cada
+pérdida obliga a recuperarse con un IDR, que produce un tirón y una imagen peor durante un momento.
+Para la nitidez, eso cuesta más de lo que aportan los bits extra.
+
+### Nitidez medida en las capturas del patrón (H.264, 80 Mbps, 120 FPS, en movimiento)
+
+Las capturas de los fotogramas 17061, 17656, 18261 y 19324 se compararon con el mismo fotograma
+generado por `image-test.html`. Solo se midieron las zonas cuyos píxeles no dependen de las fuentes
+de Windows (el texto necesita la captura del propio PC):
+
+| Zona | Nitidez | SSIM | PSNR luma | PSNR croma |
+|---|---|---|---|---|
+| Rejillas y dameros de 1 y 2 px (estáticos) | **100 %** (idénticos bit a bit) | 1,000 | ∞ | ∞ |
+| Rampa de grises (estática) | 101,8 % | 0,990 | 45,3 dB | 65,5 dB |
+| **Textura en movimiento** | **98,3 %** (93–100) | 0,997 | 43,5 dB | 35,5 dB |
+| Líneas verdes/magenta de 1 px (horizontales) | 99,3 % | 0,999 | 45,9 dB | 7,5 dB |
+| Líneas rojas/azules de 1 px (verticales) | 31,7 % | 0,60 | 22,9 dB | 10,5 dB |
+
+* Con este contenido (el patrón usa pocos bits: el 5 % de los fotogramas en el techo), **el detalle
+  de luma llega igual que en el PC**, quieto y en movimiento.
+* Lo que se pierde es el **color fino**, por el croma 4:2:0 que el ZTE no puede evitar. Las líneas de
+  color de 1 px se mezclan; en las rojas/azules, que casi solo se distinguen por el color, se pierde
+  hasta la diferencia de luma.
+* Hay además un desplazamiento de nivel pequeño y constante (+2 a +3 niveles de luma). Está
+  pendiente de explicar: puede venir de las conversiones de rango.
+* En la nitidez de este análisis, la medida ya no usa el filtro Sobel, que da cero en patrones de
+  1 px, sino diferencias entre píxeles vecinos. El mismo cambio está en `compare-captures.html`.
+
+### Cambios en ULL.8
+
+| Cambio | Motivo |
+|---|---|
+| **Capturas separadas por carpeta.** Las de Moonlight van a `ull-sessions/<versión>/capturas/moonlight/`; `capturas/pc/` se crea con una nota para las del PC. Las capturas de ULL.7 se mueven solas a su `capturas/moonlight/` | Petición del usuario: no mezclar las del PC con las de Moonlight |
+| **PNG sin comprimir durante el stream y recompresión al final**; tiempos de copia y de PNG en el informe; columna `capture` en el CSV | Coste de las capturas de ULL.7 (ver arriba) |
+| **Aviso de FPS por encima del refresco de la pantalla** | 120 FPS en 60 Hz: la mitad de los fotogramas no se ve y cada uno tiene la mitad de bits |
+| `image-test.html`: **código de fotograma** en la cabecera (36 bloques blanco/negro); **B** genera en `capturas/pc/` la captura del PC de cada captura de Moonlight del patrón, con el mismo nombre; **C** guarda la pantalla en `capturas/pc/`; el puntero se oculta sobre el patrón | Capturas del PC exactas, en su carpeta, sin hacerlas a mano |
+| `compare-captures.html`: **modo carpeta** (`capturas/` con `moonlight/` y `pc/`), que empareja por nombre o por código de fotograma, mide la zona estática y la de movimiento y saca medias por configuración. Nitidez por diferencias entre vecinos | Comparar decenas de capturas de una vez; el filtro Sobel no ve los patrones de 1 px |
+
+### Próximas pruebas (ULL.8)
+
+1. En la app: **60 FPS** y capturas cada 30 s. Patrón a pantalla completa en el PC, ayuda oculta
+   (H), en movimiento (M).
+2. Unos 2 minutos por configuración: H.264 a 50 Mbps, HEVC a 50 Mbps y, si se quiere, HEVC a 80
+   Mbps vigilando las pérdidas.
+3. Copia `ull-sessions/12.2-ULL.8/` al PC. En `image-test.html` (pantalla completa), pulsa **B** y
+   elige `capturas`: se rellena `capturas/pc/`.
+4. Abre `compare-captures.html` y elige la carpeta `capturas`: tabla con nitidez y SSIM de la zona
+   estática y la de movimiento por configuración.
+5. Envía `ull-sessions/12.2-ULL.8/` completa, con `capturas/`.
